@@ -17,6 +17,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import com.spicymango.fanfictionreader.Settings;
 import com.spicymango.fanfictionreader.activity.Site;
 import com.spicymango.fanfictionreader.provider.SqlConstants;
 import com.spicymango.fanfictionreader.provider.StoryProvider;
@@ -220,11 +221,6 @@ class DownloaderFactory {
 		 */
 		private long mLastRequestTime = 0;
 
-		/**
-		 * The minimum time to wait between consecutive chapter requests.
-		 */
-		private static final long MIN_REQUEST_INTERVAL_MS = 3000;
-
 
 		@SuppressLint("AddJavascriptInterface")
 		private FanFictionDownloader(Uri uri, Context context, WebView webView) {
@@ -329,11 +325,13 @@ class DownloaderFactory {
 		@Override
 		public void downloadChapter() throws IOException, ParseException, StoryNotFoundException {
 			// Throttle requests so consecutive chapter downloads don't fire back-to-back, which can
-			// trigger FanFiction.net's bot-detection after a burst of rapid requests.
+			// trigger FanFiction.net's bot-detection after a burst of rapid requests. The delay is
+			// user-configurable via Settings > Delay Between Chapters.
+			final long minRequestIntervalMs = Settings.getDownloadDelayMs(mContext);
 			final long elapsedSinceLastRequest = System.currentTimeMillis() - mLastRequestTime;
-			if (mLastRequestTime != 0 && elapsedSinceLastRequest < MIN_REQUEST_INTERVAL_MS) {
+			if (mLastRequestTime != 0 && elapsedSinceLastRequest < minRequestIntervalMs) {
 				try {
-					Thread.sleep(MIN_REQUEST_INTERVAL_MS - elapsedSinceLastRequest);
+					Thread.sleep(minRequestIntervalMs - elapsedSinceLastRequest);
 				} catch (InterruptedException e) {
 					Thread.currentThread().interrupt();
 				}
