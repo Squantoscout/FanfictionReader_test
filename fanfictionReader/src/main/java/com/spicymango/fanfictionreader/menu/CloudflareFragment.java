@@ -165,7 +165,9 @@ public class CloudflareFragment extends Fragment {
 		public void onReceivedError(WebView view, WebResourceRequest request,
 									WebResourceError error) {
 			super.onReceivedError(view, request, error);
-			if (!request.getUrl().toString().contains("pagead")) {
+			// Only treat this as a fatal error if it affects the main page being loaded, not a
+			// sub-resource (ad, tracker, font, etc.) embedded within it.
+			if (request.isForMainFrame() && !request.getUrl().toString().contains("pagead")) {
 				closeFragment("404");
 			}
 		}
@@ -174,6 +176,11 @@ public class CloudflareFragment extends Fragment {
 		public void onReceivedHttpError(WebView view, WebResourceRequest request,
 										WebResourceResponse errorResponse) {
 			super.onReceivedHttpError(view, request, errorResponse);
+			// Only treat this as a fatal error if it affects the main page being loaded, not a
+			// sub-resource (ad, tracker, font, etc.) embedded within it. Without this check, a
+			// single blocked ad or tracking script would be wrongly reported as the entire page
+			// failing to load.
+			if (!request.isForMainFrame()) return;
 			waitThenCloseFragment();
 		}
 
