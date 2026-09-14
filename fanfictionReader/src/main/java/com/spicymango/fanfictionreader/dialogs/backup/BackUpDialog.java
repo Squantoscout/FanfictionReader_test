@@ -2,9 +2,8 @@ package com.spicymango.fanfictionreader.dialogs.backup;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FilenameFilter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -15,42 +14,45 @@ import com.slezica.tools.async.TaskManagerFragment;
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.util.FileHandler;
 
-import android.Manifest;
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.content.Context;
-import android.content.pm.PackageManager;
-import android.media.MediaScannerConnection;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
-import android.os.Environment;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
-import androidx.core.content.ContextCompat;
 import android.widget.ProgressBar;
 import android.widget.Toast;
 
 /**
  * A dialog that backs up all the application data files into a zip file.
  * <p>
- *     If necessary, the dialog will request for the WRITE_EXTERNAL_STORAGE permission.
+ *     The destination is chosen by the user via the system file picker (Storage Access
+ *     Framework), which works reliably under Android's Scoped Storage rules on every modern
+ *     Android version - unlike writing directly to a fixed path on shared storage, which is
+ *     blocked outright on Android 10+ regardless of permissions granted.
  * </p>
  */
 public class BackUpDialog extends DialogFragment {
-	private static final String STATE_REQUEST_PERMISSION = "STATE_Request_permission";
+	private static final int REQUEST_CREATE_DOCUMENT = 100;
+	private static final String STATE_AWAITING_PICKER = "STATE_Awaiting_picker";
 
-	/** The backup file path. For the moment, the file must be in the root*/
+	/** The default file name suggested to the user in the save-location picker.*/
 	public static final String FILENAME = "FanFiction_backup.bak";
 
 	/** The progress bar in the back up dialog*/
 	private ProgressBar mBar;
 
 	/**
-	 * True if the app should request for the permission, false if it has already been requested.
+	 * True if the file picker has been launched but has not yet returned a result. Used to avoid
+	 * re-launching the picker every time the dialog is resumed (e.g. after a configuration
+	 * change).
 	 */
-	private boolean requestPermission;
+	private boolean awaitingPicker;
 
 	@Override
 	@NonNull
@@ -65,69 +67,57 @@ public class BackUpDialog extends DialogFragment {
 		// Create the dialog
 		final AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
 		builder.setTitle(R.string.diag_back_up);
+		builder.setMessage(R.string.diag_back_up_message);
 		builder.setView(mBar);
 
-		if (isSdCardWritable(getActivity())) {
-			builder.setMessage(R.string.diag_back_up_external);
-		} else {
-			builder.setMessage(R.string.diag_back_up_internal);
-		}
-
-		requestPermission = savedInstanceState == null || savedInstanceState.getBoolean(STATE_REQUEST_PERMISSION, true);
+		awaitingPicker = savedInstanceState != null && savedInstanceState.getBoolean(STATE_AWAITING_PICKER, false);
 
 		return builder.create();
 	}
 
 	@Override
 	public void onSaveInstanceState(Bundle outState) {
-		outState.putBoolean(STATE_REQUEST_PERMISSION, requestPermission);
+		outState.putBoolean(STATE_AWAITING_PICKER, awaitingPicker);
 		super.onSaveInstanceState(outState);
-	}
-
-	private static boolean isSdCardWritable(Context context){
-
-		if (FileHandler.isExternalStorageWritable(context)) {
-			// User has an sd card with write permissions
-			int currentApiVersion = android.os.Build.VERSION.SDK_INT;
-			// Lollipop does not allow for sd card access without using the ACTION_OPEN_DOCUMENT_TREE,
-			// even though the sd card permission is set.
-			return currentApiVersion < android.os.Build.VERSION_CODES.LOLLIPOP;
-		} else {
-			return false;
-		}
 	}
 
 	@Override
 	public void onResume() {
 		super.onResume();
 
-		// In order to save the backup, the storage permission is required.
-		final int storagePermissionState = ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE);
-		boolean hasStoragePermission = storagePermissionState == PackageManager.PERMISSION_GRANTED;
+		// Only launch the picker once; onActivityResult takes over from there.
+		if (!awaitingPicker) {
+			awaitingPicker = true;
 
-		if (hasStoragePermission) {
-			// If the storage permission is available, start the backup task
-			startBackUpTask();
-		} else if (requestPermission){
-			// If the storage permission is not available and the app has not requested it
-			// in the current session, request for the permission
-			requestPermission = false;
-			requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-							   0);
-		} else{
-			// If the storage permission is not available and the application already requested for
-			// the permission, the user must have denied it. Dismiss the dialog with an error
-			// message.
-			dismiss();
-			Toast.makeText(getContext(),R.string.error_permission_denied, Toast.LENGTH_SHORT).show();
+			final Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+			intent.addCategory(Intent.CATEGORY_OPENABLE);
+			intent.setType("application/octet-stream");
+			intent.putExtra(Intent.EXTRA_TITLE, FILENAME);
+			startActivityForResult(intent, REQUEST_CREATE_DOCUMENT);
 		}
 	}
 
-	private void startBackUpTask(){
+	@Override
+	public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+		if (requestCode == REQUEST_CREATE_DOCUMENT) {
+			awaitingPicker = false;
+
+			if (resultCode == FragmentActivity.RESULT_OK && data != null && data.getData() != null) {
+				startBackUpTask(data.getData());
+			} else {
+				// The user backed out of the picker without choosing a location.
+				dismiss();
+			}
+		} else {
+			super.onActivityResult(requestCode, resultCode, data);
+		}
+	}
+
+	private void startBackUpTask(Uri destination){
 		// Start the managed async task if it has not been started already.
 		Fragment manager = getFragmentManager().findFragmentByTag(TaskManagerFragment.DEFAULT_TAG);
 		if (manager == null) {
-			new BackUpTask(getActivity()).execute((Void)null);
+			new BackUpTask(getActivity(), destination).execute((Void)null);
 		}
 	}
 
@@ -138,19 +128,23 @@ public class BackUpDialog extends DialogFragment {
 		private int mTotalFiles = 0;
 		private int mZippedFiles = 0;
 
-		private final File app_internal[], output;
+		private final File app_internal[];
+		private final Uri destination;
 
 		private final ArrayList<File> appFiles;
 
-		BackUpTask(FragmentActivity activity) {
+		BackUpTask(FragmentActivity activity, Uri destination) {
 			super(activity);
+			this.destination = destination;
+
 			String s = activity.getApplicationInfo().dataDir;
 			app_internal = new File(s).listFiles(new FilesDirFilter());
 
 			appFiles = new ArrayList<>(3);
 
 			// Get the path of all the app files in both the sd card, the emulated memory, and the
-			// internal memory
+			// internal memory. These are the app's own directories, which remain fully accessible
+			// regardless of Scoped Storage restrictions on shared storage.
 			appFiles.add(activity.getFilesDir());
 
 			if (FileHandler.isExternalStorageWritable(activity)) {
@@ -161,18 +155,6 @@ public class BackUpDialog extends DialogFragment {
 				final File emulatedDir = FileHandler.getEmulatedFilesDir(activity);
 				if (emulatedDir != null)
 					appFiles.add(emulatedDir);
-			}
-
-
-			// Get the destination path
-			if (isSdCardWritable(activity)) {
-				// Only true if there is an sd card and android version is less than 5.0
-				output = new File(FileHandler.getExternalStorageDirectory(activity), FILENAME);
-			} else if (FileHandler.isEmulatedFilesDirWritable()) {
-				output = new File(Environment.getExternalStorageDirectory(), FILENAME);
-			} else {
-				output = null;
-				cancel(true);
 			}
 		}
 
@@ -193,14 +175,14 @@ public class BackUpDialog extends DialogFragment {
 			// Set the maximum possible progress in the progress bar
 			publishProgress(mZippedFiles);
 
-			final FileOutputStream fos;
 			ZipOutputStream zos = null;
 
 			byte[] buffer = new byte[1024];
 
 			try {
-				fos = new FileOutputStream(output);
-				zos = new ZipOutputStream(fos);
+				final OutputStream os = getActivity().getContentResolver().openOutputStream(destination);
+				if (os == null) throw new IOException("Unable to open the selected destination");
+				zos = new ZipOutputStream(os);
 
 				// Zip all files
 				for (File f : app_internal) {
@@ -215,7 +197,7 @@ public class BackUpDialog extends DialogFragment {
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
 			} finally {
-				// Note that ZipOutputStream closes the underlying FileOutputStream
+				// Note that ZipOutputStream closes the underlying OutputStream
 				try {
 					if (zos != null)
 						zos.close();
@@ -244,11 +226,6 @@ public class BackUpDialog extends DialogFragment {
 		protected void onPostExecute(Integer result) {
 			Toast toast = Toast.makeText(getActivity(), result, Toast.LENGTH_SHORT);
 			toast.show();
-
-			// Fix for android issue 195362, in which files do not show in the MTP file explorer
-			// until a device reboot occurs.
-			// See https://code.google.com/p/android/issues/detail?id=195362
-			MediaScannerConnection.scanFile(getActivity(), new String[]{output.getAbsolutePath()}, null, null);
 
 			FragmentManager manager = getActivity().getSupportFragmentManager();
 
@@ -338,7 +315,7 @@ public class BackUpDialog extends DialogFragment {
 		 *
 		 * @author Michael Chen
 		 */
-		private final static class FilesDirFilter implements FilenameFilter{
+		private final static class FilesDirFilter implements java.io.FilenameFilter{
 			@Override
 			public boolean accept(File dir, String filename) {
 				return !filename.equalsIgnoreCase("Files");
