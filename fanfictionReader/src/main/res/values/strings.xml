@@ -104,6 +104,16 @@
     <string name="pref_volume_buttons_scroll_story">Volume buttons to scroll story</string>
     <string name="pref_incremental_summary_off">Updating a story will redownload every chapter</string>
     <string name="pref_incremental_summary_on">Updating a story will only download new chapters. Revised chapters will not be updated.</string>
+    <string name="pref_download_delay">Delay Between Chapters</string>
+    <string name="pref_download_delay_summary">Time to wait between downloading each chapter. Lower is faster, but may trigger a site\'s rate-limiting on longer stories.</string>
+    <string-array name="pref_download_delay_entries">
+        <item>1 second</item>
+        <item>2 seconds</item>
+        <item>3 seconds (default)</item>
+        <item>5 seconds</item>
+        <item>10 seconds</item>
+        <item>20 seconds</item>
+    </string-array>
     <string name="pref_wake_lock">Keep Screen On</string>
     <string name="pref_crash_reporting" translatable="false">Automatically Report Crashes</string>
     <string name="pref_back_and_restore">Backup and restore</string>
@@ -140,7 +150,7 @@
     </plurals>
 
     <string name="downloader_error">Error downloading story</string>
-	<string name="downloader_overlay_permission_required">Please enable "Display over other apps" for this app, then try downloading again</string>
+    <string name="downloader_overlay_permission_required">Please enable "Display over other apps" for this app, then try downloading again</string>
 
     <!-- Community Menu Activity -->
     <string name="menu_community_random">Random</string>
