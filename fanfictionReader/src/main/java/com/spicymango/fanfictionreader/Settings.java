@@ -3,7 +3,6 @@ package com.spicymango.fanfictionreader;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.spicymango.fanfictionreader.dialogs.backup.BackUpDialog;
 import com.spicymango.fanfictionreader.dialogs.FontDialog;
-import com.spicymango.fanfictionreader.dialogs.backup.RestoreDialog;
 import com.spicymango.fanfictionreader.dialogs.backup.RestoreDialogConfirmation;
 import com.spicymango.fanfictionreader.util.FileHandler;
 
@@ -110,7 +109,6 @@ public class Settings extends AppCompatActivity {
 
 			// Check if the restore button is clicked
 			final Preference restore = findPreference(getString(R.string.pref_key_restore));
-			restore.setEnabled(RestoreDialog.findBackUpFile(getActivity()) != null);
 			restore.setOnPreferenceClickListener(this);
 
 			// Check if the font button is clicked
