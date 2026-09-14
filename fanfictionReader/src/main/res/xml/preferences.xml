@@ -36,6 +36,15 @@
             android:summaryOff="@string/pref_incremental_summary_off"
             android:summaryOn="@string/pref_incremental_summary_on"
             android:title="@string/pref_incremental_updating"/>
+
+        <ListPreference
+            android:defaultValue="@string/pref_download_delay_default"
+            android:dialogTitle="@string/pref_download_delay"
+            android:entries="@array/pref_download_delay_entries"
+            android:entryValues="@array/pref_download_delay_values"
+            android:key="@string/pref_key_download_delay"
+            android:summary="@string/pref_download_delay_summary"
+            android:title="@string/pref_download_delay"/>
     </PreferenceCategory>
     <PreferenceCategory
         android:orderingFromXml="true"
