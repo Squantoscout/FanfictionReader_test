@@ -21,7 +21,7 @@ import com.spicymango.fanfictionreader.dialogs.AboutDialog;
 
 public class MainActivity extends AppCompatActivity implements OnNavigationItemSelectedListener {
 	private static final String FIRST_TIME_USER = "MainActivity.FIRST_TIME_USER";
-	private static boolean ENABLE_DRAWER = false;
+	private static boolean ENABLE_DRAWER = true;
 	
 	protected static final int INTENT_SETTINGS = 0;
 	
