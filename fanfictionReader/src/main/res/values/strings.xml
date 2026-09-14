@@ -121,6 +121,7 @@
     <string name="pref_restore">Restore files from memory</string>
     
     <string name="diag_back_up">Creating Backup</string>
+    <string name="diag_back_up_message">Backing up your library and settings…</string>
     <string name="toast_back_up">Back up successful</string>
     <string name="error_backup_not_found">Back up file not found</string>
     <string name="error_permission_denied">Permission Denied</string>
