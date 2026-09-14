@@ -261,6 +261,24 @@ public class Settings extends AppCompatActivity {
 	}
 
 	/**
+	 * Gets the minimum delay, in milliseconds, that should be observed between consecutive
+	 * chapter download requests. A larger delay reduces the chance of triggering a site's
+	 * rate-limiting or bot-detection during a large download, at the cost of a slower download.
+	 * @param context The current context
+	 * @return The delay, in milliseconds
+	 */
+	public static long getDownloadDelayMs(Context context){
+		SharedPreferences sharedPref = PreferenceManager.getDefaultSharedPreferences(context);
+		String value = sharedPref.getString(context.getString(R.string.pref_key_download_delay),
+				context.getString(R.string.pref_download_delay_default));
+		try {
+			return Long.parseLong(value);
+		} catch (NumberFormatException e) {
+			return 3000;
+		}
+	}
+
+	/**
 	 * Checks if the volume keys should be used to scroll in stories. If true, the volume keys
 	 * should be able to scroll a chapter.
 	 * @param context The current context
