@@ -69,10 +69,36 @@ final class StoryMenuLoaders {
 			return builder.build();
 		}
 
+		/**
+		 * Records which specific field was missing when a work's blurb didn't match an expected
+		 * selector, along with a snippet of that work's own HTML block - so a mismatch here shows
+		 * exactly which selector needs fixing, rather than a bare "parsing error".
+		 *
+		 * @param fieldName    The name of the field that could not be found
+		 * @param storyElement The HTML block for the specific work that failed to parse
+		 * @return Always false, so this can be used directly as a return statement
+		 */
+		private boolean missingField(String fieldName, Element storyElement) {
+			final String snippet = storyElement.outerHtml();
+			setLastErrorDetail("Missing \"" + fieldName + "\" in a work's blurb. Blurb HTML: "
+					+ (snippet.length() > 400 ? snippet.substring(0, 400) + "..." : snippet));
+			return false;
+		}
+
 		@Override
 		protected boolean load(Document document, List<Story> list) {
 
 			Elements stories = document.select("li.work.blurb.group");
+
+			if (stories.isEmpty()) {
+				// Diagnostic: confirm whether we got the intended page at all, and whether a
+				// similarly-named but different wrapper class might be the real one.
+				final String title = document.title();
+				final Elements similarElements = document.select("li[class*=work]");
+				setLastErrorDetail("Page title: \"" + title + "\". Found 0 works via \"li.work.blurb.group\","
+						+ " but " + similarElements.size() + " elements matching \"li[class*=work]\".");
+				return false;
+			}
 
 			for (Element story : stories) {
 
@@ -80,7 +106,7 @@ final class StoryMenuLoaders {
 
 				// Fetch the title, the author, and the story id
 				Elements header = story.select("h4.heading a");
-				if (header.size() < 2) return false;
+				if (header.size() < 2) return missingField("h4.heading a (title/author)", story);
 				Element title = header.first();
 				Element author = header.last();
 				String id = title.attr("href").replaceAll("[\\D]", "");
@@ -91,7 +117,7 @@ final class StoryMenuLoaders {
 
 				// Fetch the rating
 				Element rating = story.select("span.rating").first();
-				if (rating == null) return false;
+				if (rating == null) return missingField("span.rating", story);
 				builder.setRating(rating.text());
 
 				// Fetch the summary
@@ -108,17 +134,17 @@ final class StoryMenuLoaders {
 
 				// Fetch the language
 				Element language = story.select("dd.language").first();
-				if (language == null) return false;
+				if (language == null) return missingField("dd.language", story);
 				builder.setLanguage(language.ownText());
 
 				// Fetch the number of words
 				Element words = story.select("dd.words").first();
-				if (words == null) return false;
+				if (words == null) return missingField("dd.words", story);
 				builder.setWordLength(Parser.parseInt(words.ownText()));
 
 				// Fetch the number of chapters
 				Element chapters = story.select("dd.chapters").first();
-				if (chapters == null) return false;
+				if (chapters == null) return missingField("dd.chapters", story);
 				String chapterNo = chapters.text();
 				chapterNo = chapterNo.substring(0, chapterNo.indexOf('/'));
 				builder.setChapterLength(Integer.parseInt(chapterNo));
@@ -143,7 +169,7 @@ final class StoryMenuLoaders {
 
 				// Fetch the update date
 				Element updateText = story.select("p.datetime").first();
-				if (updateText == null) return false;
+				if (updateText == null) return missingField("p.datetime", story);
 				try {
 					Date updateDate = mFormat.parse(updateText.text());
 					builder.setUpdateDate(updateDate);
