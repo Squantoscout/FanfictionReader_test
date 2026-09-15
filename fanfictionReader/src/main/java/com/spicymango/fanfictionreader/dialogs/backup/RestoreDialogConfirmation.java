@@ -49,13 +49,17 @@ public class RestoreDialogConfirmation extends DialogFragment implements OnClick
 	@Override
 	public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
 		if (requestCode == REQUEST_OPEN_DOCUMENT) {
+			// Capture the fragment manager before dismissing, since dismiss() begins removing
+			// this fragment and it's safer not to rely on this fragment's own state afterward.
+			final androidx.fragment.app.FragmentManager fm = getFragmentManager();
 			dismiss();
 
 			if (resultCode == FragmentActivity.RESULT_OK && data != null && data.getData() != null) {
 				DialogFragment diag = RestoreDialog.newInstance(data.getData());
-				diag.show(getFragmentManager(), diag.getClass().getName());
+				diag.show(fm, diag.getClass().getName());
+			} else if (getActivity() != null) {
+				android.widget.Toast.makeText(getActivity(), R.string.toast_restore_cancelled, android.widget.Toast.LENGTH_SHORT).show();
 			}
-			// If the user cancelled the picker, do nothing further.
 		} else {
 			super.onActivityResult(requestCode, resultCode, data);
 		}

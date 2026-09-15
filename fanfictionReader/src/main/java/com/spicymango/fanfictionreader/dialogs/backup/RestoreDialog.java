@@ -63,6 +63,7 @@ public class RestoreDialog extends DialogFragment {
 
 		AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
 		builder.setTitle(R.string.diag_restoring);
+		builder.setMessage(getString(R.string.diag_restore_progress, 0));
 		builder.setView(bar);
 
 		return builder.create();
@@ -143,6 +144,7 @@ public class RestoreDialog extends DialogFragment {
 						zis.closeEntry();
 					}
 				}
+				publishProgress(filesRestored);
 
 			} catch (ZipException e) {
 				result = R.string.error_corrupted;
@@ -161,6 +163,10 @@ public class RestoreDialog extends DialogFragment {
 							RestoreDialog.class.getName());
 			if (diag != null) {
 				diag.bar.setProgress(values[0]);
+				final Dialog dialog = diag.getDialog();
+				if (dialog instanceof AlertDialog) {
+					((AlertDialog) dialog).setMessage(diag.getString(R.string.diag_restore_progress, values[0]));
+				}
 			}
 		}
 
@@ -211,7 +217,9 @@ public class RestoreDialog extends DialogFragment {
 			String name = entry.getName();
 
 			filesRestored++;
-			publishProgress(filesRestored);
+			if (filesRestored % 20 == 0) {
+				publishProgress(filesRestored);
+			}
 
 			if (!name.contains("files")) {
 				output = new File(dataFile, name);

@@ -106,6 +106,9 @@ public class BackUpDialog extends DialogFragment {
 				startBackUpTask(data.getData());
 			} else {
 				// The user backed out of the picker without choosing a location.
+				if (getActivity() != null) {
+					Toast.makeText(getActivity(), R.string.toast_back_up_cancelled, Toast.LENGTH_SHORT).show();
+				}
 				dismiss();
 			}
 		} else {
@@ -193,6 +196,8 @@ public class BackUpDialog extends DialogFragment {
 					zipDir(zos, f, buffer, f.getName());
 				}
 
+				publishProgress(mZippedFiles);
+
 			} catch (IOException e) {
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
@@ -266,7 +271,7 @@ public class BackUpDialog extends DialogFragment {
 				if (file.isDirectory()) {
 					// Recursively zip directories
 					zipDir(zos, file, buffer, parent + '/' + file.getName());
-				} else {
+				} else if (shouldIncludeFile(file)) {
 					try (FileInputStream in = new FileInputStream(file)) {
 						final ZipEntry entry = new ZipEntry(parent + '/' + file.getName());
 						zos.putNextEntry(entry);
@@ -278,9 +283,12 @@ public class BackUpDialog extends DialogFragment {
 						}
 						zos.closeEntry();
 
-						// Update the progress bar
+						// Update the progress bar (throttled to avoid flooding the main thread
+						// with updates when backing up a library with many thousands of files)
 						mZippedFiles++;
-						publishProgress(mZippedFiles);
+						if (mZippedFiles % 20 == 0) {
+							publishProgress(mZippedFiles);
+						}
 					} catch (IOException e) {
 						throw new IOException(e.getMessage());
 					}
@@ -302,7 +310,7 @@ public class BackUpDialog extends DialogFragment {
 			for (File file : files) {
 				if (file.isDirectory()) {
 					count += countFiles(file);
-				}else{
+				}else if (shouldIncludeFile(file)){
 					count++;
 				}
 			}
@@ -310,16 +318,36 @@ public class BackUpDialog extends DialogFragment {
 		}
 
 		/**
-		 * A simple file filter that separates saved files from the database and
-		 * the settings.
+		 * A simple file filter that only allows the app's databases and shared preferences
+		 * folders through, since those are the only parts of the internal data directory that
+		 * actually matter for restoring a library. Everything else under the app's internal
+		 * directory (WebView cache, analytics databases, temporary files, etc.) is excluded, since
+		 * including it made backups needlessly enormous (hundreds of MB, tens of thousands of
+		 * files) without containing anything useful to restore.
 		 *
 		 * @author Michael Chen
 		 */
 		private final static class FilesDirFilter implements java.io.FilenameFilter{
 			@Override
 			public boolean accept(File dir, String filename) {
-				return !filename.equalsIgnoreCase("Files");
+				return filename.equalsIgnoreCase("databases") || filename.equalsIgnoreCase("shared_prefs");
 			}
+		}
+
+		/**
+		 * Checks whether a given file should be included in the backup. Used to further trim the
+		 * "databases" folder down to just the app's own library database, excluding unrelated
+		 * databases (e.g. Firebase analytics) that add bulk without adding any value to a restore.
+		 *
+		 * @param file The file being considered
+		 * @return True if the file should be included in the backup
+		 */
+		private static boolean shouldIncludeFile(File file) {
+			final String path = file.getPath().replace('\\', '/');
+			if (path.contains("/databases/")) {
+				return file.getName().startsWith("library.db");
+			}
+			return true;
 		}
 	}
 }
