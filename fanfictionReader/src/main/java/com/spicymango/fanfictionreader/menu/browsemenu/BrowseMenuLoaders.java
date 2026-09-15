@@ -24,6 +24,13 @@ final class BrowseMenuLoaders {
 	/* Archive of Our Own Loaders */
 	protected final static class ArchiveOfOurOwnBrowseLoader extends BaseLoader<BrowseMenuItem> {
 
+		/**
+		 * The real, current fandom directory page. AO3's plain homepage (previously used here)
+		 * was redesigned at some point and no longer contains a fandom-browsing widget at all -
+		 * this is the actual page that lists fandoms by media category.
+		 */
+		private static final Uri FANDOM_DIRECTORY_URI = Uri.parse("https://archiveofourown.org/media");
+
 		public ArchiveOfOurOwnBrowseLoader(Context context, Bundle savedInstanceState) {
 			super(context, savedInstanceState);
 		}
@@ -35,23 +42,30 @@ final class BrowseMenuLoaders {
 
 		@Override
 		protected Uri getUri(int currentPage) {
-			return Sites.ARCHIVE_OF_OUR_OWN.BASE_URI;
+			return FANDOM_DIRECTORY_URI;
 		}
 
 		@Override
 		protected boolean load(Document document, List<BrowseMenuItem> list) {
-			Elements fandoms = document.select("div.browse.module a");
+			// Each fandom category (Anime & Manga, Books & Literature, etc.) lists its top
+			// fandoms as links to that fandom's tag page. Restricting to hrefs containing
+			// "/tags/" excludes the "All <Category>..." links and any navigation/footer links
+			// that might otherwise match a broader selector.
+			Elements fandoms = document.select("ol.fandom.index.group a[href*=/tags/]");
 
-			if (fandoms.isEmpty()) { return false; }
+			if (fandoms.isEmpty()) {
+				// Diagnostic-only for now: capture a snippet of whatever the page actually
+				// contained, so a mismatch between this selector and AO3's real markup can be
+				// diagnosed directly from the error message rather than guessed at blind.
+				final String bodyText = document.body() != null ? document.body().text() : "(no body)";
+				setLastErrorDetail("AO3 fandom directory: " + (bodyText.length() > 200 ? bodyText.substring(0, 200) + "..." : bodyText));
+				return false;
+			}
 
 			for (Element element : fandoms) {
 				final Uri url = Uri.parse(element.attr("abs:href"));
 				final String title = element.ownText();
-
-				// Skip the "All Fandoms" category
-				if (url.equals(Uri.parse("http://archiveofourown.org/media"))) {
-					continue;
-				}
+				if (title.isEmpty()) continue;
 
 				list.add(new BrowseMenuItem(title, url));
 			}

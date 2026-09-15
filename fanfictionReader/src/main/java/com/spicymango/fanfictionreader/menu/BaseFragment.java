@@ -146,7 +146,12 @@ public abstract class BaseFragment<T extends Parcelable> extends Fragment
 			case ERROR_PARSE:
 				// Display a parsing error
 				mErrorBar.setVisibility(View.VISIBLE);
-				mRetryLabel.setText(R.string.error_parsing_mini);
+				final String parseDetail = mLoader.getLastErrorDetail();
+				if (parseDetail != null && !parseDetail.isEmpty()) {
+					mRetryLabel.setText(getString(R.string.error_parsing_mini) + "\n" + parseDetail);
+				} else {
+					mRetryLabel.setText(R.string.error_parsing_mini);
+				}
 				break;
 			case ERROR_CLOUDFLARE_CAPTCHA:
 				// Launch a new fragment

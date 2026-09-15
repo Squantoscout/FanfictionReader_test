@@ -35,6 +35,32 @@ public abstract class BaseLoader<T extends Parcelable> extends
 	private final static String STATE_STATUS = "STATE STATUS";
 	private final static String STATE_TOTAL = "STATE TOTAL PAGES";
 	private String htmlFromWebView;
+
+	/**
+	 * Holds a short diagnostic snippet from the most recent parsing failure (e.g. what the page
+	 * actually contained when the expected elements weren't found), so it can be shown to the
+	 * user directly instead of only a generic "parsing error" message.
+	 */
+	private String lastErrorDetail;
+
+	/**
+	 * Gets the diagnostic detail from the most recent parsing failure, or null if there is none.
+	 */
+	@Nullable
+	public final String getLastErrorDetail() {
+		return lastErrorDetail;
+	}
+
+	/**
+	 * Allows a subclass's {@link #load(Document, List)} implementation to record a short
+	 * diagnostic snippet explaining why parsing failed, shown to the user alongside the generic
+	 * parsing error message.
+	 *
+	 * @param detail A short, human-readable diagnostic snippet, or null to clear it.
+	 */
+	protected final void setLastErrorDetail(@Nullable String detail) {
+		lastErrorDetail = detail;
+	}
 	
 	/**
 	 * An interface that must be implemented by any loader that offers
@@ -230,6 +256,7 @@ public abstract class BaseLoader<T extends Parcelable> extends
 		// Check for parsing errors
 		if (load(document, mDataOld)) {
 			mStatus = Result.SUCCESS;
+			lastErrorDetail = null;
 
 			// Check the total page number if required
 			if (mTotalPages == 0) {
