@@ -106,14 +106,17 @@ final class StoryMenuLoaders {
 
 				// Fetch the title, the author, and the story id
 				Elements header = story.select("h4.heading a");
-				if (header.size() < 2) return missingField("h4.heading a (title/author)", story);
+				if (header.isEmpty()) return missingField("h4.heading a (title)", story);
 				Element title = header.first();
-				Element author = header.last();
+				// Anonymous works only have one link in the heading (the title) - the author is
+				// shown as plain "Anonymous" text rather than a linked username, so there's no
+				// second link to grab in that case.
+				final String authorName = header.size() >= 2 ? header.last().ownText() : "Anonymous";
 				String id = title.attr("href").replaceAll("[\\D]", "");
 
 				builder.setName(title.ownText());
 				builder.setId(Integer.parseInt(id));
-				builder.setAuthor(author.ownText());
+				builder.setAuthor(authorName);
 
 				// Fetch the rating
 				Element rating = story.select("span.rating").first();
