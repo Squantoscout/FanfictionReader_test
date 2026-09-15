@@ -3,6 +3,7 @@ package com.spicymango.fanfictionreader;
 import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.spicymango.fanfictionreader.dialogs.backup.BackUpDialog;
 import com.spicymango.fanfictionreader.dialogs.FontDialog;
+import com.spicymango.fanfictionreader.dialogs.backup.RestoreDialog;
 import com.spicymango.fanfictionreader.dialogs.backup.RestoreDialogConfirmation;
 import com.spicymango.fanfictionreader.util.FileHandler;
 
@@ -17,11 +18,13 @@ import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Typeface;
+import android.net.Uri;
 import android.os.Bundle;
 import android.preference.Preference;
 import android.preference.Preference.OnPreferenceChangeListener;
 import android.preference.Preference.OnPreferenceClickListener;
 import android.preference.PreferenceManager;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentTransaction;
 import androidx.core.preference.PreferenceFragment;
@@ -33,6 +36,64 @@ import java.util.Locale;
 
 
 public class Settings extends AppCompatActivity {
+
+	/**
+	 * Request code for the "create backup file" system picker. Handled at the Activity level
+	 * (rather than in a transient DialogFragment) since Activities reliably receive their
+	 * result even if the app was backgrounded long enough for lightweight dialog fragments to
+	 * be reclaimed while the picker was open.
+	 */
+	public static final int REQUEST_CREATE_BACKUP = 100;
+
+	/**
+	 * Request code for the "pick a backup file to restore" system picker. See
+	 * {@link #REQUEST_CREATE_BACKUP} for why this is handled here rather than in a dialog.
+	 */
+	public static final int REQUEST_OPEN_BACKUP = 101;
+
+	/**
+	 * Launches the system file picker so the user can choose where to save a new backup.
+	 * The result is handled in {@link #onActivityResult(int, int, Intent)}.
+	 */
+	public void launchBackupPicker() {
+		final Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+		intent.addCategory(Intent.CATEGORY_OPENABLE);
+		intent.setType("application/octet-stream");
+		intent.putExtra(Intent.EXTRA_TITLE, BackUpDialog.FILENAME);
+		startActivityForResult(intent, REQUEST_CREATE_BACKUP);
+	}
+
+	/**
+	 * Launches the system file picker so the user can choose a backup file to restore from.
+	 * The result is handled in {@link #onActivityResult(int, int, Intent)}.
+	 */
+	public void launchRestorePicker() {
+		final Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+		intent.addCategory(Intent.CATEGORY_OPENABLE);
+		intent.setType("*/*");
+		startActivityForResult(intent, REQUEST_OPEN_BACKUP);
+	}
+
+	@Override
+	protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+		super.onActivityResult(requestCode, resultCode, data);
+
+		if (requestCode == REQUEST_CREATE_BACKUP) {
+			if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+				final DialogFragment dialog = BackUpDialog.newInstance(data.getData());
+				dialog.show(getSupportFragmentManager(), dialog.getClass().getName());
+			} else {
+				android.widget.Toast.makeText(this, R.string.toast_back_up_cancelled, android.widget.Toast.LENGTH_SHORT).show();
+			}
+		} else if (requestCode == REQUEST_OPEN_BACKUP) {
+			if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+				final DialogFragment dialog = RestoreDialog.newInstance(data.getData());
+				dialog.show(getSupportFragmentManager(), dialog.getClass().getName());
+			} else {
+				android.widget.Toast.makeText(this, R.string.toast_restore_cancelled, android.widget.Toast.LENGTH_SHORT).show();
+			}
+		}
+	}
 
 	public final static int SANS_SERIF = 0;
 	public final static int SERIF = 1;
@@ -197,8 +258,7 @@ public class Settings extends AppCompatActivity {
 		@Override
 		public boolean onPreferenceClick(Preference preference) {
 			if (preference.getKey().equals(getString(R.string.pref_key_back_up))) {
-				DialogFragment dialog = new BackUpDialog();
-				dialog.show(getFragmentManager(), dialog.getClass().getName());
+				((Settings) getActivity()).launchBackupPicker();
 			}else if (preference.getKey().equals(getString(R.string.pref_key_restore))){
 				DialogFragment dialog = new RestoreDialogConfirmation();
 				dialog.show(getFragmentManager(), dialog.getClass().getName());
