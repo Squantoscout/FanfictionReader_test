@@ -16,11 +16,9 @@ import com.spicymango.fanfictionreader.util.FileHandler;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
-import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
@@ -38,8 +36,7 @@ import android.widget.Toast;
  * </p>
  */
 public class BackUpDialog extends DialogFragment {
-	private static final int REQUEST_CREATE_DOCUMENT = 100;
-	private static final String STATE_AWAITING_PICKER = "STATE_Awaiting_picker";
+	private static final String ARG_DESTINATION_URI = "ARG_destination_uri";
 
 	/** The default file name suggested to the user in the save-location picker.*/
 	public static final String FILENAME = "FanFiction_backup.bak";
@@ -48,11 +45,16 @@ public class BackUpDialog extends DialogFragment {
 	private ProgressBar mBar;
 
 	/**
-	 * True if the file picker has been launched but has not yet returned a result. Used to avoid
-	 * re-launching the picker every time the dialog is resumed (e.g. after a configuration
-	 * change).
+	 * Creates a new instance of the dialog that will back up to the given destination.
+	 * @param destinationUri The Uri of the destination file, as returned by the system file picker.
 	 */
-	private boolean awaitingPicker;
+	public static BackUpDialog newInstance(Uri destinationUri) {
+		final BackUpDialog dialog = new BackUpDialog();
+		final Bundle args = new Bundle();
+		args.putParcelable(ARG_DESTINATION_URI, destinationUri);
+		dialog.setArguments(args);
+		return dialog;
+	}
 
 	@Override
 	@NonNull
@@ -70,50 +72,19 @@ public class BackUpDialog extends DialogFragment {
 		builder.setMessage(R.string.diag_back_up_message);
 		builder.setView(mBar);
 
-		awaitingPicker = savedInstanceState != null && savedInstanceState.getBoolean(STATE_AWAITING_PICKER, false);
-
 		return builder.create();
-	}
-
-	@Override
-	public void onSaveInstanceState(Bundle outState) {
-		outState.putBoolean(STATE_AWAITING_PICKER, awaitingPicker);
-		super.onSaveInstanceState(outState);
 	}
 
 	@Override
 	public void onResume() {
 		super.onResume();
 
-		// Only launch the picker once; onActivityResult takes over from there.
-		if (!awaitingPicker) {
-			awaitingPicker = true;
-
-			final Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
-			intent.addCategory(Intent.CATEGORY_OPENABLE);
-			intent.setType("application/octet-stream");
-			intent.putExtra(Intent.EXTRA_TITLE, FILENAME);
-			startActivityForResult(intent, REQUEST_CREATE_DOCUMENT);
+		final Uri destination = getArguments() != null ? (Uri) getArguments().getParcelable(ARG_DESTINATION_URI) : null;
+		if (destination == null) {
+			dismiss();
+			return;
 		}
-	}
-
-	@Override
-	public void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
-		if (requestCode == REQUEST_CREATE_DOCUMENT) {
-			awaitingPicker = false;
-
-			if (resultCode == FragmentActivity.RESULT_OK && data != null && data.getData() != null) {
-				startBackUpTask(data.getData());
-			} else {
-				// The user backed out of the picker without choosing a location.
-				if (getActivity() != null) {
-					Toast.makeText(getActivity(), R.string.toast_back_up_cancelled, Toast.LENGTH_SHORT).show();
-				}
-				dismiss();
-			}
-		} else {
-			super.onActivityResult(requestCode, resultCode, data);
-		}
+		startBackUpTask(destination);
 	}
 
 	private void startBackUpTask(Uri destination){
