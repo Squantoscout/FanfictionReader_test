@@ -201,6 +201,15 @@ public class LibraryDownloader extends IntentService {
 	 */
 	private boolean mWebViewAttachedToWindow;
 
+	/**
+	 * Running totals used to build a live "time remaining" estimate for the whole batch: as each
+	 * story's chapter count becomes known, it's added here, giving a rolling average of
+	 * chapters-per-story and time-per-chapter that improves as the run progresses.
+	 */
+	private int totalChaptersDiscoveredSoFar = 0;
+	private int storiesDiscoveredSoFar = 0;
+	private int totalChaptersCompletedThisRun = 0;
+
 	public LibraryDownloader() {
 		super(LibraryDownloader.class.getName());
 	}
@@ -319,6 +328,9 @@ public class LibraryDownloader extends IntentService {
 		hasIoError = false;
 		consecutiveConnectionErrors = 0;
 		sCancelRequested = false;
+		totalChaptersDiscoveredSoFar = 0;
+		storiesDiscoveredSoFar = 0;
+		totalChaptersCompletedThisRun = 0;
 
 		// An atomic integer is used to synchronize incoming requests (which occur on the main
 		// thread) with the website downloads, which occur asynchronously.
@@ -602,17 +614,21 @@ public class LibraryDownloader extends IntentService {
 			if (integrityCheck){
 				// If an integrity check is requested, re-download all missing chapters
 				// Download each missing chapter, updating the notification as required
+				final int integrityStartPage = downloader.getCurrentChapter();
+				storiesDiscoveredSoFar++;
+				totalChaptersDiscoveredSoFar += Math.max(0, downloader.getTotalChapters() - integrityStartPage + 1);
 				integrityLoop:
 				while (downloader.hasNextChapter()) {
 					if (sCancelRequested) break integrityLoop;
 
-					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime);
+					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime, integrityStartPage);
 
 					while (true){
 						if (sCancelRequested) break integrityLoop;
 						try {
 							downloader.downloadIfMissing();
 							consecutiveConnectionErrors = 0;
+							totalChaptersCompletedThisRun++;
 							break;
 						} catch (IOException e){
 							// Wait 5 seconds and re-download the chapter
@@ -658,17 +674,21 @@ public class LibraryDownloader extends IntentService {
 				}
 
 				// Download each chapter, updating the notification as required
+				final int updateStartPage = downloader.getCurrentChapter();
+				storiesDiscoveredSoFar++;
+				totalChaptersDiscoveredSoFar += Math.max(0, downloader.getTotalChapters() - updateStartPage + 1);
 				updateLoop:
 				while (downloader.hasNextChapter()) {
 					if (sCancelRequested) break updateLoop;
 
-					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime);
+					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime, updateStartPage);
 
 					while (true){
 						if (sCancelRequested) break updateLoop;
 						try {
 							downloader.downloadChapter();
 							consecutiveConnectionErrors = 0;
+							totalChaptersCompletedThisRun++;
 							break;
 						} catch (IOException e){
 							// Wait 5 seconds and re-download the chapter
@@ -707,6 +727,12 @@ public class LibraryDownloader extends IntentService {
 					}
 				}
 				updated = true;
+			} else {
+				// This story doesn't need any updates at all right now. Still count it towards
+				// the discovery stats (as needing 0 chapters), so the rolling average used for
+				// estimating remaining stories in "quick" mode isn't skewed by ignoring
+				// already-up-to-date stories, which are common in a real library.
+				storiesDiscoveredSoFar++;
 			}
 
 			// The saveStory method is called regardless of whether an update was done or not since
@@ -872,10 +898,17 @@ public class LibraryDownloader extends IntentService {
 		// Calculate the percentage of stories checked
 		final double percent = (((double) currentStory) / totalStories) * 100;
 
+		String text = String.format(Locale.US, "%.2f%% (%d/%d)", percent, currentStory + 1, totalStories);
+
+		final String eta = buildBatchEtaText();
+		if (eta != null) {
+			text += " " + eta;
+		}
+
 		// Create the notification
 		NotificationCompat.Builder builder = new NotificationCompat.Builder(LibraryDownloader.this, NOTIFICATION_CHANNEL);
 		builder.setContentTitle(getString(R.string.downloader_checking_updates));
-		builder.setContentText(String.format(Locale.US, "%.2f%% (%d/%d)", percent, currentStory + 1, totalStories));
+		builder.setContentText(text);
 		builder.setProgress(totalStories, currentStory, currentStory == totalStories);
 		builder.setWhen(updateStartTime);
 		builder.setUsesChronometer(true);
@@ -891,6 +924,33 @@ public class LibraryDownloader extends IntentService {
 		NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 		assert manager != null;
 		manager.notify(NOTIFICATION_UPDATE_ID, builder.build());
+	}
+
+	/**
+	 * Builds a "time remaining" estimate for the whole batch, or null if there isn't enough data
+	 * yet to make one. Uses a rolling average of chapters-per-story and time-per-chapter observed
+	 * so far in this run, which becomes more accurate as the run progresses but may be rough
+	 * early on or with a very mixed library.
+	 */
+	private String buildBatchEtaText() {
+		if (totalChaptersCompletedThisRun <= 0 || storiesDiscoveredSoFar <= 0) {
+			// Not enough data yet to estimate a time-per-chapter.
+			return null;
+		}
+
+		final long avgMsPerChapter = (System.currentTimeMillis() - updateStartTime) / totalChaptersCompletedThisRun;
+
+		// Project the remaining, not-yet-checked stories using the average chapters-per-story
+		// observed so far in this run.
+		final double avgChaptersPerStory = (double) totalChaptersDiscoveredSoFar / storiesDiscoveredSoFar;
+		final int chaptersLeftInDiscoveredStories = Math.max(0, totalChaptersDiscoveredSoFar - totalChaptersCompletedThisRun);
+		final int estimatedChaptersInUndiscoveredStories = (int) Math.round(avgChaptersPerStory * mStoryQueueLength.get());
+		final int chaptersRemaining = chaptersLeftInDiscoveredStories + estimatedChaptersInUndiscoveredStories;
+
+		if (chaptersRemaining <= 0) return null;
+
+		final long etaMs = avgMsPerChapter * chaptersRemaining;
+		return getString(R.string.downloader_eta, DateUtils.formatElapsedTime(etaMs / 1000L));
 	}
 
 	private void showUpdateNotification(){
@@ -912,16 +972,32 @@ public class LibraryDownloader extends IntentService {
 	}
 
 	/**
-	 * When chapters for a specific story are being downloaded, shows the story title and page
-	 * number
+	 * When chapters for a specific story are being downloaded, shows the story title, page
+	 * number, and a live estimate of the time remaining for this story, based on the average
+	 * time each chapter has actually taken so far in this story.
 	 *
 	 * @param storyTitle  The story's title
 	 * @param currentPage The chapter being downloaded
 	 * @param TotalPage   The total number of chapters
+	 * @param startPage   The chapter number this story's download started from (1, unless
+	 *                    incremental updating skipped ahead), used to measure how many chapters
+	 *                    have actually completed so far in this story.
 	 */
-	private void showUpdateNotification(String storyTitle, int currentPage, int TotalPage, long downloadStartTime) {
+	private void showUpdateNotification(String storyTitle, int currentPage, int TotalPage, long downloadStartTime, int startPage) {
 		// Create the notification
-		final String text = getString(R.string.downloader_context, storyTitle, currentPage, TotalPage);
+		String text = getString(R.string.downloader_context, storyTitle, currentPage, TotalPage);
+
+		final int chaptersCompleted = currentPage - startPage;
+		if (chaptersCompleted > 0) {
+			final long elapsedMs = System.currentTimeMillis() - downloadStartTime;
+			final long avgMsPerChapter = elapsedMs / chaptersCompleted;
+			final int chaptersRemaining = TotalPage - currentPage;
+			if (chaptersRemaining > 0) {
+				final long etaMs = avgMsPerChapter * chaptersRemaining;
+				text += " " + getString(R.string.downloader_eta, DateUtils.formatElapsedTime(etaMs / 1000L));
+			}
+		}
+
 		NotificationCompat.Builder builder = new NotificationCompat.Builder(LibraryDownloader.this, NOTIFICATION_CHANNEL);
 		builder.setContentTitle(getString(R.string.downloader_downloading));
 		builder.setStyle(new NotificationCompat.BigTextStyle().bigText(text));
