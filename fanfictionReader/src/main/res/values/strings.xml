@@ -153,6 +153,18 @@
         <item quantity="other">%1$d stories added in %2$s</item>
     </plurals>
 
+    <plurals name="diag_recent_updates_title">
+        <item quantity="one">1 story updated</item>
+        <item quantity="other">%1$d stories updated</item>
+    </plurals>
+
+    <plurals name="diag_recent_failures_title">
+        <item quantity="one">1 story failed to update</item>
+        <item quantity="other">%1$d stories failed to update</item>
+    </plurals>
+
+    <string name="recent_failure_entry">%1$s (%2$s)</string>
+
     <string name="downloader_error">Error downloading story</string>
     <string name="downloader_overlay_permission_required">Please enable "Display over other apps" for this app, then try downloading again</string>
 

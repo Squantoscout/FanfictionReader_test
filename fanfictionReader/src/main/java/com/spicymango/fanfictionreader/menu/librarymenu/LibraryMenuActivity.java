@@ -61,6 +61,13 @@ import com.spicymango.fanfictionreader.util.Story;
 public class LibraryMenuActivity extends AppCompatActivity implements FilterListener {
 	private LibraryMenuFragment mFragment;
 
+	/**
+	 * The minimum number of recently-updated stories required before a dedicated scrollable
+	 * dialog is shown on opening the library. Below this, the regular notification (which can
+	 * also be expanded to show every title) is considered sufficient on its own.
+	 */
+	private static final int MIN_STORIES_FOR_UPDATE_DIALOG = 3;
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		Settings.setOrientationAndThemeNoActionBar(this);
@@ -91,6 +98,69 @@ public class LibraryMenuActivity extends AppCompatActivity implements FilterList
 	@Override
 	public void onFilter(int[] selected) {
 		mFragment.onFilter(selected);
+	}
+
+	@Override
+	protected void onResume() {
+		super.onResume();
+		showRecentActivityDialogsIfAny();
+	}
+
+	/**
+	 * Shows dialogs summarizing the most recent background update cycle, if there is anything to
+	 * report: a list of every story that failed to update (shown regardless of how many, since
+	 * there is no good place else to see this), and/or a scrollable list of every story that was
+	 * updated (only shown if there were enough of them to be worth a dedicated dialog rather than
+	 * just relying on the space-limited notification). Both lists are consumed immediately so
+	 * they are only ever shown once. If both exist, the failures dialog is shown first, followed
+	 * by the updates dialog once it is dismissed.
+	 */
+	private void showRecentActivityDialogsIfAny() {
+		final android.content.SharedPreferences prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(this);
+
+		final String storedFailures = prefs.getString(LibraryDownloader.PREF_KEY_RECENT_FAILURES, null);
+		if (storedFailures != null && !storedFailures.isEmpty()) {
+			prefs.edit().remove(LibraryDownloader.PREF_KEY_RECENT_FAILURES).apply();
+			final String[] failures = storedFailures.split("\n");
+
+			final ListView listView = new ListView(this);
+			listView.setAdapter(new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, failures));
+
+			new AlertDialog.Builder(this)
+					.setTitle(getResources().getQuantityString(R.plurals.diag_recent_failures_title, failures.length, failures.length))
+					.setView(listView)
+					.setPositiveButton(android.R.string.ok, null)
+					.setOnDismissListener(dialog -> showRecentUpdatesDialogIfAny(prefs))
+					.show();
+		} else {
+			showRecentUpdatesDialogIfAny(prefs);
+		}
+	}
+
+	/**
+	 * Shows a scrollable list of every story that was updated during the most recent background
+	 * update cycle, if there were enough of them to be worth a dedicated dialog rather than just
+	 * relying on the (space-limited) notification. The saved list is consumed immediately so it
+	 * is only shown once.
+	 */
+	private void showRecentUpdatesDialogIfAny(android.content.SharedPreferences prefs) {
+		final String stored = prefs.getString(LibraryDownloader.PREF_KEY_RECENT_UPDATES, null);
+		if (stored == null || stored.isEmpty()) return;
+
+		// Consume it immediately so it is only ever shown once.
+		prefs.edit().remove(LibraryDownloader.PREF_KEY_RECENT_UPDATES).apply();
+
+		final String[] titles = stored.split("\n");
+		if (titles.length < MIN_STORIES_FOR_UPDATE_DIALOG) return;
+
+		final ListView listView = new ListView(this);
+		listView.setAdapter(new android.widget.ArrayAdapter<>(this, android.R.layout.simple_list_item_1, titles));
+
+		new AlertDialog.Builder(this)
+				.setTitle(getResources().getQuantityString(R.plurals.diag_recent_updates_title, titles.length, titles.length))
+				.setView(listView)
+				.setPositiveButton(android.R.string.ok, null)
+				.show();
 	}
 
 	@Override

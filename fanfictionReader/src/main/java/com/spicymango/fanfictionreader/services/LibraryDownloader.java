@@ -107,6 +107,21 @@ public class LibraryDownloader extends IntentService {
 	private final static String NOTIFICATION_CHANNEL = "Channel";
 
 	/**
+	 * SharedPreferences key under which the titles of the most recently updated stories are
+	 * saved, so that {@code LibraryMenuActivity} can show a full, scrollable list of everything
+	 * that updated the next time the library screen is opened - useful when more stories update
+	 * than comfortably fit in a notification, or the notification is missed/dismissed.
+	 */
+	public final static String PREF_KEY_RECENT_UPDATES = "recent_library_updates";
+
+	/**
+	 * SharedPreferences key under which the titles (with failure reasons) of stories that failed
+	 * to update are saved, so that {@code LibraryMenuActivity} can show them the next time the
+	 * library screen is opened, regardless of how many (or how few) stories failed.
+	 */
+	public final static String PREF_KEY_RECENT_FAILURES = "recent_library_failures";
+
+	/**
 	 * The number of stories that have been already been checked for updates. This variable is used
 	 * in order to derive the total number of stories queued, which is used to generate the progress
 	 * bar.
@@ -143,6 +158,26 @@ public class LibraryDownloader extends IntentService {
 
 	/** Keeps track of story names for update purposes*/
 	private final List<String> storiesUpdated = new ArrayList<>();
+
+	/**
+	 * Keeps track of the stories that failed to update in this cycle, along with a short reason,
+	 * so the full list can be shown to the user regardless of how many succeeded.
+	 */
+	private final List<String> storiesFailed = new ArrayList<>();
+
+	/**
+	 * Counts how many stories in a row have failed entirely (as opposed to a single chapter
+	 * retry). A high count strongly suggests a systemic problem (no internet connection, or the
+	 * site itself being down) rather than an issue specific to one story, in which case the
+	 * remaining queued stories are skipped rather than pointlessly retried one by one. A single
+	 * story failing on its own no longer prevents the rest of the queue from being attempted.
+	 */
+	private int consecutiveStoryFailures = 0;
+
+	/**
+	 * The number of consecutive full-story failures after which the remaining queue is skipped.
+	 */
+	private static final int MAX_CONSECUTIVE_STORY_FAILURES = 5;
 
 	private WebView mWebView;
 
@@ -181,6 +216,19 @@ public class LibraryDownloader extends IntentService {
 	}
 
 	/**
+	 * The last time the overlay permission prompt (toast + settings screen) was shown. Used to
+	 * avoid spamming the user with a duplicate prompt for every single story when "check for
+	 * updates" queues up several downloads at once, all of which independently discover that the
+	 * permission is missing.
+	 */
+	private static volatile long sLastOverlayPromptTime = 0;
+
+	/**
+	 * The minimum time to wait before showing the overlay permission prompt again.
+	 */
+	private static final long OVERLAY_PROMPT_COOLDOWN_MS = 10_000;
+
+	/**
 	 * Checks whether the app has permission to draw overlay windows. This permission is required
 	 * because the downloader must attach its background {@link WebView} to a real window in order
 	 * for FanFiction.net's bot-detection JavaScript challenge to run correctly; a WebView that is
@@ -188,7 +236,9 @@ public class LibraryDownloader extends IntentService {
 	 * the challenge from ever completing.
 	 * <p>
 	 * If the permission has not been granted, the user is redirected to the system settings screen
-	 * where it can be enabled, and the download is not started.
+	 * where it can be enabled, and the download is not started. If this has already happened very
+	 * recently (e.g. because several stories were queued up at once via "check for updates"), the
+	 * prompt is skipped to avoid showing it repeatedly in a burst.
 	 *
 	 * @param context The calling context. If it is not an overlay-permission-eligible context the
 	 *                 permission prompt is still shown, since {@code ACTION_MANAGE_OVERLAY_PERMISSION}
@@ -205,6 +255,15 @@ public class LibraryDownloader extends IntentService {
 		if (android.provider.Settings.canDrawOverlays(context)) {
 			return true;
 		}
+
+		final long now = System.currentTimeMillis();
+		if (now - sLastOverlayPromptTime < OVERLAY_PROMPT_COOLDOWN_MS) {
+			// Already prompted very recently - most likely several stories were queued up
+			// together and each one independently discovered the permission is missing. Fail
+			// quietly rather than showing another toast and re-launching Settings.
+			return false;
+		}
+		sLastOverlayPromptTime = now;
 
 		Toast.makeText(context, R.string.downloader_overlay_permission_required, Toast.LENGTH_LONG).show();
 
@@ -408,10 +467,12 @@ public class LibraryDownloader extends IntentService {
 
 	@Override
 	protected void onHandleIntent(Intent intent) {
-		// If the connection error flag is true, a connection error occurred during the current
-		// execution of the service. It is reasonable to assume that further downloads will fail,
-		// which is why the service is cancelled.
-		if (hasConnectionError){
+		// If several stories in a row have failed entirely, that strongly suggests a systemic
+		// problem (no internet connection, or the site itself being down) rather than an issue
+		// specific to one story. In that case, stop attempting the remaining queued stories
+		// rather than retrying each one pointlessly. A single story failing on its own no longer
+		// prevents the rest of the queue from being attempted.
+		if (consecutiveStoryFailures >= MAX_CONSECUTIVE_STORY_FAILURES){
 			onUpdateComplete();
 			stopSelf();
 			return;
@@ -469,6 +530,15 @@ public class LibraryDownloader extends IntentService {
 		// name should be added to the notification.
 		boolean updated = false;
 
+		// True if this story failed to update for any reason. Tracked locally and applied to the
+		// consecutive-failure counter in the finally block below, regardless of where exactly the
+		// failure was detected (a mid-chapter break vs. an exception reaching the outer catch).
+		boolean failed = false;
+
+		// A fallback label for this story, used only if a failure occurs before the real title is
+		// known (i.e. the very first chapter fetch itself fails).
+		String storyLabel = uri != null ? uri.toString() : getString(R.string.error_unknown);
+
 		try {
 			// First, the story details are obtained in order to determine if a new update is available.
 			// Note that should an IOException occur,it should retry as required.
@@ -494,6 +564,7 @@ public class LibraryDownloader extends IntentService {
 
 			// The story title can be obtained from the story attributes
 			final String storyTitle = story.getName();
+			storyLabel = storyTitle;
 			final long downloadStartTime = System.currentTimeMillis();
 
 			if (integrityCheck){
@@ -524,6 +595,8 @@ public class LibraryDownloader extends IntentService {
 								// instead of aborting the whole method.
 								hasConnectionError = true;
 								lastConnectionErrorDetail = e.getMessage();
+								failed = true;
+								storiesFailed.add(getString(R.string.recent_failure_entry, storyTitle, getString(R.string.error_connection)));
 								break integrityLoop;
 							}
 						} catch (StoryNotFoundException | ParseException e) {
@@ -535,6 +608,8 @@ public class LibraryDownloader extends IntentService {
 								FirebaseCrashlytics.getInstance().recordException(e);
 								hasParsingError = true;
 								lastParsingErrorDetail = e.getMessage();
+								failed = true;
+								storiesFailed.add(getString(R.string.recent_failure_entry, storyTitle, getString(R.string.error_parsing)));
 							}
 							break integrityLoop;
 						}
@@ -573,6 +648,8 @@ public class LibraryDownloader extends IntentService {
 								// instead of aborting the whole method.
 								hasConnectionError = true;
 								lastConnectionErrorDetail = e.getMessage();
+								failed = true;
+								storiesFailed.add(getString(R.string.recent_failure_entry, storyTitle, getString(R.string.error_connection)));
 								break updateLoop;
 							}
 						} catch (StoryNotFoundException | ParseException e) {
@@ -584,6 +661,8 @@ public class LibraryDownloader extends IntentService {
 								FirebaseCrashlytics.getInstance().recordException(e);
 								hasParsingError = true;
 								lastParsingErrorDetail = e.getMessage();
+								failed = true;
+								storiesFailed.add(getString(R.string.recent_failure_entry, storyTitle, getString(R.string.error_parsing)));
 							}
 							break updateLoop;
 						}
@@ -617,25 +696,65 @@ public class LibraryDownloader extends IntentService {
 				// flag.
 				if (updated){
 					hasIoError = true;
+					failed = true;
+					storiesFailed.add(getString(R.string.recent_failure_entry, storyTitle, getString(R.string.error_sd)));
 				}
 			}
 
 		} catch (IOException e) {
-			// If a connection error occurs, set the flag and cancel the download by returning.
+			// If a connection error occurs, set the flag. The remaining queued stories are no
+			// longer aborted just because of this one - see consecutiveStoryFailures below.
 			hasConnectionError = true;
 			lastConnectionErrorDetail = e.getMessage();
+			failed = true;
+			storiesFailed.add(getString(R.string.recent_failure_entry, storyLabel, getString(R.string.error_connection)));
 		} catch (StoryNotFoundException e) {
 			// If the story is not found, exit without setting any flags. By not setting an error flag,
-			// notifications are avoided for deleted stories during batch updates.
+			// notifications are avoided for deleted stories during batch updates. This is not treated
+			// as a failure for the purposes of the consecutive-failure counter either.
 		} catch (ParseException e) {
 			// Parsing errors should be logged on Crashlytics for further analysis.
 			FirebaseCrashlytics.getInstance().recordException(e);
 			hasParsingError = true;
 			lastParsingErrorDetail = e.getMessage();
+			failed = true;
+			storiesFailed.add(getString(R.string.recent_failure_entry, storyLabel, getString(R.string.error_parsing)));
 		} finally{
 			// Remove the notification after the download stage is completed
 			removeNotification(NOTIFICATION_DOWNLOAD_ID);
+
+			// Track consecutive full-story failures, regardless of whether the failure was
+			// detected mid-chapter-loop or by an exception reaching this outer catch.
+			if (failed) {
+				consecutiveStoryFailures++;
+			} else {
+				consecutiveStoryFailures = 0;
+			}
 		}
+	}
+
+	/**
+	 * Saves the titles of the most recently updated stories to SharedPreferences, so that
+	 * {@code LibraryMenuActivity} can show the full list the next time it is opened, even if the
+	 * notification was missed, dismissed, or too many stories updated to comfortably read in it.
+	 *
+	 * @param storyTitles The titles of the stories that were updated in this cycle
+	 */
+	private void saveRecentUpdates(List<String> storyTitles) {
+		final android.content.SharedPreferences prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(this);
+		prefs.edit().putString(PREF_KEY_RECENT_UPDATES, TextUtils.join("\n", storyTitles)).apply();
+	}
+
+	/**
+	 * Saves the titles (with failure reasons) of stories that failed to update to
+	 * SharedPreferences, so that {@code LibraryMenuActivity} can show the full list the next time
+	 * it is opened, regardless of how many stories failed.
+	 *
+	 * @param failureEntries The formatted "title (reason)" entries for each failed story
+	 */
+	private void saveRecentFailures(List<String> failureEntries) {
+		final android.content.SharedPreferences prefs = android.preference.PreferenceManager.getDefaultSharedPreferences(this);
+		prefs.edit().putString(PREF_KEY_RECENT_FAILURES, TextUtils.join("\n", failureEntries)).apply();
 	}
 
 	/**
@@ -646,11 +765,18 @@ public class LibraryDownloader extends IntentService {
 		// the download notification should be removed.
 		removeNotification(NOTIFICATION_DOWNLOAD_ID);
 
+		// Save the list of failed stories regardless of how many stories succeeded, so it can
+		// always be shown the next time the library is opened.
+		if (!storiesFailed.isEmpty()) {
+			saveRecentFailures(storiesFailed);
+		}
+
 		// Once every intent has been processed, display a "download complete" notification
 		// if a story was updated. If an error occurred, show an error notification. If nothing
 		// was done, remove the notification.
 		if (storiesUpdated.size() > 0) {
 			// At least one story was updated. Show the title of the updated stories.
+			saveRecentUpdates(storiesUpdated);
 			showUpdateCompleteNotification(storiesUpdated);
 		} else if (hasConnectionError) {
 			showErrorNotification(R.string.error_connection, lastConnectionErrorDetail);
