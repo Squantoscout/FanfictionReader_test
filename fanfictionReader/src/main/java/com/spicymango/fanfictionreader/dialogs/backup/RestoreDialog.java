@@ -21,6 +21,7 @@ import android.app.Dialog;
 import android.net.Uri;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
@@ -102,6 +103,12 @@ public class RestoreDialog extends DialogFragment {
 
 		private final boolean saveOnInternal;
 
+		/**
+		 * Holds a human-readable description of the most recent failure, so it can be shown to
+		 * the user directly rather than only being logged remotely.
+		 */
+		private String lastErrorDetail;
+
 		RestoreTask(FragmentActivity activity, Uri sourceUri) {
 			super(activity);
 			this.sourceUri = sourceUri;
@@ -149,20 +156,25 @@ public class RestoreDialog extends DialogFragment {
 
 			} catch (ZipException e) {
 				result = R.string.error_corrupted;
+				lastErrorDetail = e.getMessage();
 			} catch (FileNotFoundException e) {
 				result = R.string.error_backup_not_found;
+				lastErrorDetail = e.getMessage();
 			} catch (SecurityException e) {
 				// The app lost permission to read the picked file - most commonly because the
 				// app was killed in the background while the file picker was open (e.g. if the
 				// user browsed around for a while) and the permission grant didn't survive.
 				result = R.string.error_permission_denied;
+				lastErrorDetail = e.getMessage();
 			} catch (IOException e) {
 				result = R.string.error_unknown;
+				lastErrorDetail = e.getClass().getSimpleName() + ": " + e.getMessage();
 			} catch (Exception e) {
 				// A safety net: any other unexpected error should show a message rather than
 				// crash the whole app.
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
+				lastErrorDetail = e.getClass().getSimpleName() + ": " + e.getMessage();
 			}
 			return result;
 		}
@@ -184,9 +196,7 @@ public class RestoreDialog extends DialogFragment {
 		@Override
 		protected void onPostExecute(Integer result) {
 
-			Toast toast = Toast.makeText(getActivity(), result,
-					Toast.LENGTH_SHORT);
-			toast.show();
+			showResultDialog(result, lastErrorDetail);
 
 			FragmentManager manager = getActivity().getSupportFragmentManager();
 
@@ -200,6 +210,27 @@ public class RestoreDialog extends DialogFragment {
 							.findFragmentByTag(TaskManagerFragment.DEFAULT_TAG))
 					.commit();
 
+		}
+
+		/**
+		 * Shows the result of the restore attempt. On failure, this includes the technical
+		 * detail of what went wrong (rather than only a generic message), since that detail is
+		 * otherwise only visible in a remote crash log the user has no access to.
+		 *
+		 * @param resultStringId The string resource describing the general outcome
+		 * @param detail         Optional technical detail to show alongside the general outcome,
+		 *                       or null if there is none (e.g. on success).
+		 */
+		private void showResultDialog(int resultStringId, @Nullable String detail) {
+			final String message = detail == null || detail.isEmpty()
+					? getActivity().getString(resultStringId)
+					: getActivity().getString(resultStringId) + "\n\n" + detail;
+
+			new AlertDialog.Builder(getActivity())
+					.setTitle(R.string.diag_restoring)
+					.setMessage(message)
+					.setPositiveButton(android.R.string.ok, null)
+					.show();
 		}
 
 		@Override
