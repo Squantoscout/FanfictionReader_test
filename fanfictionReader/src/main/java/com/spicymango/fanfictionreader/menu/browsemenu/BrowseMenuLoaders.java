@@ -47,19 +47,16 @@ final class BrowseMenuLoaders {
 
 		@Override
 		protected boolean load(Document document, List<BrowseMenuItem> list) {
-			// Each fandom category (Anime & Manga, Books & Literature, etc.) lists its top
-			// fandoms as links to that fandom's tag page. Restricting to hrefs containing
-			// "/tags/" excludes the "All <Category>..." links and any navigation/footer links
-			// that might otherwise match a broader selector.
-			Elements fandoms = document.select("ol.fandom.index.group a[href*=/tags/]");
+			// Real fandom links on this page all end in "/works" (e.g. /tags/Harry Potter/works).
+			// The only other "/tags/" link on the page is the site's own "Search > Tags" nav
+			// item, which doesn't end in "/works" and is naturally excluded by this condition -
+			// confirmed directly against the live page rather than guessed at a wrapper class,
+			// since a previous attempt at guessing the wrapper class (ol.fandom.index.group)
+			// turned out not to match AO3's actual markup.
+			Elements fandoms = document.select("a[href*=/tags/][href$=/works]");
 
 			if (fandoms.isEmpty()) {
-				// The previous diagnostic just printed the first 200 characters of the page,
-				// which is useless here since AO3 puts the same generic privacy notice at the
-				// top of nearly every page regardless of what's actually wrong. Instead: report
-				// the page title (confirms whether we even got the intended page at all) and a
-				// broader, unscoped link search (confirms whether the real content is present
-				// under a different wrapper than assumed, or is genuinely missing/blocked).
+				// Diagnostic fallback in case AO3 changes this markup again in the future.
 				final String title = document.title();
 				final Elements anyTagLinks = document.select("a[href*=/tags/]");
 				setLastErrorDetail("Page title: \"" + title + "\". Found 0 fandom links via the expected"
