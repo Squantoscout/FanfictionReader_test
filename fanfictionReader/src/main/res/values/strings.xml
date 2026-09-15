@@ -166,6 +166,7 @@
     <string name="recent_failure_entry">%1$s (%2$s)</string>
 
     <string name="downloader_error">Error downloading story</string>
+    <string name="toast_update_cancelled">Update cancelled</string>
     <string name="downloader_overlay_permission_required">Please enable "Display over other apps" for this app, then try downloading again</string>
 
     <!-- Community Menu Activity -->

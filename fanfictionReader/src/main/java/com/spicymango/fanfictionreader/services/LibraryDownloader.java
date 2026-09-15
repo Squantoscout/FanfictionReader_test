@@ -122,6 +122,20 @@ public class LibraryDownloader extends IntentService {
 	public final static String PREF_KEY_RECENT_FAILURES = "recent_library_failures";
 
 	/**
+	 * Intent action used by the "Cancel" notification button to stop an in-progress update or
+	 * download. Handled directly in {@link #onStartCommand} rather than being queued as a normal
+	 * download request, so it takes effect immediately even if other stories are still queued up.
+	 */
+	private static final String ACTION_CANCEL = "com.spicymango.fanfictionreader.services.ACTION_CANCEL";
+
+	/**
+	 * True if the user has tapped "Cancel" on the notification. Checked at the start of each
+	 * queued story and at the start of each chapter within a story, so that cancellation takes
+	 * effect promptly without losing whatever chapters have already been downloaded so far.
+	 */
+	private static volatile boolean sCancelRequested = false;
+
+	/**
 	 * The number of stories that have been already been checked for updates. This variable is used
 	 * in order to derive the total number of stories queued, which is used to generate the progress
 	 * bar.
@@ -304,6 +318,7 @@ public class LibraryDownloader extends IntentService {
 		hasConnectionError = false;
 		hasIoError = false;
 		consecutiveConnectionErrors = 0;
+		sCancelRequested = false;
 
 		// An atomic integer is used to synchronize incoming requests (which occur on the main
 		// thread) with the website downloads, which occur asynchronously.
@@ -431,6 +446,14 @@ public class LibraryDownloader extends IntentService {
 
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
+		// Handle the "Cancel" notification action immediately, rather than queuing it as a normal
+		// download request. This takes effect right away regardless of how many stories are
+		// currently queued or in progress.
+		if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
+			sCancelRequested = true;
+			return START_NOT_STICKY;
+		}
+
 		// Add the story to the queue of stories that need to be checked for updates and increments
 		// the queue length by one.
 		mStoryQueueLength.incrementAndGet();
@@ -467,6 +490,14 @@ public class LibraryDownloader extends IntentService {
 
 	@Override
 	protected void onHandleIntent(Intent intent) {
+		// If the user has tapped "Cancel" on the notification, stop attempting any further
+		// queued stories.
+		if (sCancelRequested) {
+			onUpdateComplete();
+			stopSelf();
+			return;
+		}
+
 		// If several stories in a row have failed entirely, that strongly suggests a systemic
 		// problem (no internet connection, or the site itself being down) rather than an issue
 		// specific to one story. In that case, stop attempting the remaining queued stories
@@ -543,6 +574,7 @@ public class LibraryDownloader extends IntentService {
 			// First, the story details are obtained in order to determine if a new update is available.
 			// Note that should an IOException occur,it should retry as required.
 			while (true){
+				if (sCancelRequested) return;
 				try {
 					story = downloader.getStoryState();
 					consecutiveConnectionErrors = 0;
@@ -572,9 +604,12 @@ public class LibraryDownloader extends IntentService {
 				// Download each missing chapter, updating the notification as required
 				integrityLoop:
 				while (downloader.hasNextChapter()) {
+					if (sCancelRequested) break integrityLoop;
+
 					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime);
 
 					while (true){
+						if (sCancelRequested) break integrityLoop;
 						try {
 							downloader.downloadIfMissing();
 							consecutiveConnectionErrors = 0;
@@ -625,9 +660,12 @@ public class LibraryDownloader extends IntentService {
 				// Download each chapter, updating the notification as required
 				updateLoop:
 				while (downloader.hasNextChapter()) {
+					if (sCancelRequested) break updateLoop;
+
 					showUpdateNotification(storyTitle, downloader.getCurrentChapter(), downloader.getTotalChapters(), downloadStartTime);
 
 					while (true){
+						if (sCancelRequested) break updateLoop;
 						try {
 							downloader.downloadChapter();
 							consecutiveConnectionErrors = 0;
@@ -772,12 +810,16 @@ public class LibraryDownloader extends IntentService {
 		}
 
 		// Once every intent has been processed, display a "download complete" notification
-		// if a story was updated. If an error occurred, show an error notification. If nothing
-		// was done, remove the notification.
+		// if a story was updated. If an error occurred, show an error notification. If the user
+		// cancelled, say so explicitly rather than showing a misleading error. If nothing was
+		// done, remove the notification.
 		if (storiesUpdated.size() > 0) {
-			// At least one story was updated. Show the title of the updated stories.
+			// At least one story was updated. Show the title of the updated stories, even if the
+			// batch was subsequently cancelled before finishing the rest of the queue.
 			saveRecentUpdates(storiesUpdated);
 			showUpdateCompleteNotification(storiesUpdated);
+		} else if (sCancelRequested) {
+			showCancelledNotification();
 		} else if (hasConnectionError) {
 			showErrorNotification(R.string.error_connection, lastConnectionErrorDetail);
 		} else if (hasParsingError) {
@@ -809,6 +851,23 @@ public class LibraryDownloader extends IntentService {
 	 * @param totalStories The total number of stories in the queue, including previously checked
 	 *                     stories.
 	 */
+	/**
+	 * Builds the "Cancel" action shown on the checking/downloading notifications, which lets the
+	 * user stop an in-progress update or download without having to force-stop or uninstall the
+	 * app. Tapping it is handled immediately in {@link #onStartCommand}.
+	 */
+	private NotificationCompat.Action buildCancelAction() {
+		final Intent cancelIntent = new Intent(this, LibraryDownloader.class);
+		cancelIntent.setAction(ACTION_CANCEL);
+
+		final int flags = PendingIntent.FLAG_UPDATE_CURRENT
+				| (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M ? PendingIntent.FLAG_IMMUTABLE : 0);
+
+		final PendingIntent cancelPendingIntent = PendingIntent.getService(this, 0, cancelIntent, flags);
+		return new NotificationCompat.Action(android.R.drawable.ic_menu_close_clear_cancel,
+				getString(android.R.string.cancel), cancelPendingIntent);
+	}
+
 	private void showCheckingNotification(int currentStory, int totalStories) {
 		// Calculate the percentage of stories checked
 		final double percent = (((double) currentStory) / totalStories) * 100;
@@ -822,6 +881,7 @@ public class LibraryDownloader extends IntentService {
 		builder.setUsesChronometer(true);
 		builder.setSmallIcon(android.R.drawable.ic_popup_sync);
 		builder.setAutoCancel(false);
+		builder.addAction(buildCancelAction());
 
 		// Set an empty Pending Intent on the notification
 		PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, new Intent(), PendingIntent.FLAG_UPDATE_CURRENT);
@@ -839,6 +899,7 @@ public class LibraryDownloader extends IntentService {
 		builder.setContentTitle(getString(R.string.downloader_downloading));
 		builder.setSmallIcon(android.R.drawable.stat_sys_download);
 		builder.setAutoCancel(false);
+		builder.addAction(buildCancelAction());
 
 		// Set an empty Pending Intent on the notification
 		PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, new Intent(), PendingIntent.FLAG_UPDATE_CURRENT);
@@ -869,6 +930,7 @@ public class LibraryDownloader extends IntentService {
 		builder.setUsesChronometer(true);
 		builder.setSmallIcon(android.R.drawable.stat_sys_download);
 		builder.setAutoCancel(false);
+		builder.addAction(buildCancelAction());
 
 		// Set an empty Pending Intent on the notification
 		PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, new Intent(), PendingIntent.FLAG_UPDATE_CURRENT);
@@ -900,6 +962,25 @@ public class LibraryDownloader extends IntentService {
 		NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
 		assert manager != null;
 		manager.notify(NOTIFICATION_DOWNLOAD_ID, builder.build());
+	}
+
+	/**
+	 * Shows a notification confirming that the update/download was cancelled by the user, rather
+	 * than falling through to the generic error notification (which would misleadingly suggest
+	 * something went wrong).
+	 */
+	private void showCancelledNotification() {
+		NotificationCompat.Builder builder = new NotificationCompat.Builder(LibraryDownloader.this, NOTIFICATION_CHANNEL);
+		builder.setContentTitle(getString(R.string.toast_update_cancelled));
+		builder.setSmallIcon(R.drawable.ic_not_close);
+		builder.setAutoCancel(true);
+
+		PendingIntent pendingIntent = PendingIntent.getActivity(getApplicationContext(), 0, new Intent(), PendingIntent.FLAG_UPDATE_CURRENT);
+		builder.setContentIntent(pendingIntent);
+
+		NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+		assert manager != null;
+		manager.notify(NOTIFICATION_UPDATE_ID, builder.build());
 	}
 
 	/**
