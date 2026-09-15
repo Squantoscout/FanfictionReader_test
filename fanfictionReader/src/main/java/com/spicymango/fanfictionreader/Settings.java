@@ -87,6 +87,16 @@ public class Settings extends AppCompatActivity {
 			}
 		} else if (requestCode == REQUEST_OPEN_BACKUP) {
 			if (resultCode == Activity.RESULT_OK && data != null && data.getData() != null) {
+				// Best-effort: try to make the permission grant for this file more durable, in
+				// case the picker involved enough navigation that the app was killed in the
+				// background and had to be recreated before this callback arrived.
+				try {
+					getContentResolver().takePersistableUriPermission(data.getData(), Intent.FLAG_GRANT_READ_URI_PERMISSION);
+				} catch (SecurityException ignored) {
+					// Not all document providers support persistable permissions; that's fine,
+					// the immediate read attempt in RestoreDialog will still be tried regardless.
+				}
+
 				final DialogFragment dialog = RestoreDialog.newInstance(data.getData());
 				dialog.show(getSupportFragmentManager(), dialog.getClass().getName());
 			} else {
