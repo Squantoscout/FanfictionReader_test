@@ -117,7 +117,12 @@ public class BrowseMenuActivity extends AppCompatActivity {
 				setSubTitle(Sites.ARCHIVE_OF_OUR_OWN.TITLE);
 				mLoaderOff = args -> new ArchiveOfOurOwnBrowseLoader(getActivity(), args);
 				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					Intent i = new Intent(getActivity(), CategoryMenuActivity.class);
+					// AO3 has no FanFiction.net-style genre/subgenre hierarchy - tapping a fandom
+					// goes straight to that fandom's story list, the same way FictionPress does
+					// below, rather than through CategoryMenuActivity (which expects
+					// FanFiction.net's category page structure and doesn't know how to handle an
+					// AO3 tag URL, silently falling through and finishing).
+					Intent i = new Intent(getActivity(), StoryMenuActivity.class);
 					i.setData(getItem(position).uri);
 					startActivity(i);
 				});
