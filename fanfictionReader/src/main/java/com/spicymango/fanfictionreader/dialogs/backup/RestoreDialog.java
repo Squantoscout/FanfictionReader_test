@@ -18,6 +18,7 @@ import com.spicymango.fanfictionreader.util.FileHandler;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
@@ -104,6 +105,16 @@ public class RestoreDialog extends DialogFragment {
 		private final boolean saveOnInternal;
 
 		/**
+		 * The application context, captured up front in the constructor while the Activity is
+		 * definitely still alive, rather than calling getActivity() again later from the
+		 * background thread. ManagedAsyncTask's tracked Activity reference can briefly be null if
+		 * the Activity was recreated (e.g. the process was killed in the background while the
+		 * system file picker was open) - using the application context instead avoids a crash in
+		 * that situation, since it never goes null for the lifetime of the process.
+		 */
+		private final Context appContext;
+
+		/**
 		 * Holds a human-readable description of the most recent failure, so it can be shown to
 		 * the user directly rather than only being logged remotely.
 		 */
@@ -112,6 +123,7 @@ public class RestoreDialog extends DialogFragment {
 		RestoreTask(FragmentActivity activity, Uri sourceUri) {
 			super(activity);
 			this.sourceUri = sourceUri;
+			this.appContext = activity.getApplicationContext();
 
 			// Set up directories
 			intFilesDir = activity.getFilesDir();
@@ -128,7 +140,7 @@ public class RestoreDialog extends DialogFragment {
 		protected Integer doInBackground(Void... params) {
 			int result = R.string.toast_restore_successful;
 
-			try (InputStream is = getActivity().getContentResolver().openInputStream(sourceUri)) {
+			try (InputStream is = appContext.getContentResolver().openInputStream(sourceUri)) {
 				if (is == null) throw new FileNotFoundException("Unable to open the selected backup file");
 
 				// Delete any pre-existing files, as they will be inaccessible after the restore
@@ -181,6 +193,8 @@ public class RestoreDialog extends DialogFragment {
 
 		@Override
 		protected void onProgressUpdate(Integer... values) {
+			if (getActivity() == null) return;
+
 			RestoreDialog diag = (RestoreDialog) getActivity()
 					.getSupportFragmentManager().findFragmentByTag(
 							RestoreDialog.class.getName());
@@ -195,6 +209,7 @@ public class RestoreDialog extends DialogFragment {
 
 		@Override
 		protected void onPostExecute(Integer result) {
+			if (getActivity() == null) return;
 
 			showResultDialog(result, lastErrorDetail);
 
@@ -203,12 +218,12 @@ public class RestoreDialog extends DialogFragment {
 			DialogFragment diag = (DialogFragment) manager
 					.findFragmentByTag(RestoreDialog.class.getName());
 
-			diag.dismiss();
+			if (diag != null) diag.dismiss();
 
-			manager.beginTransaction()
-					.remove(manager
-							.findFragmentByTag(TaskManagerFragment.DEFAULT_TAG))
-					.commit();
+			final Fragment taskManagerFragment = manager.findFragmentByTag(TaskManagerFragment.DEFAULT_TAG);
+			if (taskManagerFragment != null) {
+				manager.beginTransaction().remove(taskManagerFragment).commit();
+			}
 
 		}
 

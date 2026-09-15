@@ -16,6 +16,7 @@ import com.spicymango.fanfictionreader.util.FileHandler;
 
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
@@ -107,9 +108,23 @@ public class BackUpDialog extends DialogFragment {
 
 		private final ArrayList<File> appFiles;
 
+		/**
+		 * The application context, captured up front in the constructor while the Activity is
+		 * definitely still alive, rather than calling getActivity() again later from the
+		 * background thread. See the equivalent field in RestoreDialog for why this matters.
+		 */
+		private final Context appContext;
+
+		/**
+		 * Holds a human-readable description of the most recent failure, so it can be shown to
+		 * the user directly rather than only being logged remotely.
+		 */
+		private String lastErrorDetail;
+
 		BackUpTask(FragmentActivity activity, Uri destination) {
 			super(activity);
 			this.destination = destination;
+			this.appContext = activity.getApplicationContext();
 
 			String s = activity.getApplicationInfo().dataDir;
 			app_internal = new File(s).listFiles(new FilesDirFilter());
@@ -154,7 +169,7 @@ public class BackUpDialog extends DialogFragment {
 			byte[] buffer = new byte[1024];
 
 			try {
-				final OutputStream os = getActivity().getContentResolver().openOutputStream(destination);
+				final OutputStream os = appContext.getContentResolver().openOutputStream(destination);
 				if (os == null) throw new IOException("Unable to open the selected destination");
 				zos = new ZipOutputStream(os);
 
@@ -172,15 +187,18 @@ public class BackUpDialog extends DialogFragment {
 			} catch (IOException e) {
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
+				lastErrorDetail = e.getClass().getSimpleName() + ": " + e.getMessage();
 			} catch (SecurityException e) {
 				// The app lost permission to write to the picked destination - most commonly
 				// because the app was killed in the background while the file picker was open.
 				result = R.string.error_permission_denied;
+				lastErrorDetail = e.getMessage();
 			} catch (Exception e) {
 				// A safety net: any other unexpected error should show a message rather than
 				// crash the whole app.
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
+				lastErrorDetail = e.getClass().getSimpleName() + ": " + e.getMessage();
 			} finally {
 				// Note that ZipOutputStream closes the underlying OutputStream
 				try {
@@ -189,6 +207,7 @@ public class BackUpDialog extends DialogFragment {
 				} catch (IOException e) {
 					FirebaseCrashlytics.getInstance().recordException(e);
 					result = R.string.error_unknown;
+					lastErrorDetail = e.getClass().getSimpleName() + ": " + e.getMessage();
 				}
 			}
 			return result;
@@ -196,8 +215,10 @@ public class BackUpDialog extends DialogFragment {
 
 		@Override
 		protected void onProgressUpdate(Integer... values) {
+			if (getActivity() == null) return;
 			final FragmentManager manager = getActivity().getSupportFragmentManager();
 			BackUpDialog dialog = (BackUpDialog) manager.findFragmentByTag(BackUpDialog.class.getName());
+			if (dialog == null) return;
 
 			// On the first progress update, set the progress bar maximum
 			if (values[0] == 0) {
@@ -209,20 +230,29 @@ public class BackUpDialog extends DialogFragment {
 
 		@Override
 		protected void onPostExecute(Integer result) {
-			Toast toast = Toast.makeText(getActivity(), result, Toast.LENGTH_SHORT);
-			toast.show();
+			if (getActivity() == null) return;
+
+			final String message = lastErrorDetail == null || lastErrorDetail.isEmpty()
+					? getActivity().getString(result)
+					: getActivity().getString(result) + "\n\n" + lastErrorDetail;
+
+			new AlertDialog.Builder(getActivity())
+					.setTitle(R.string.diag_back_up)
+					.setMessage(message)
+					.setPositiveButton(android.R.string.ok, null)
+					.show();
 
 			FragmentManager manager = getActivity().getSupportFragmentManager();
 
 			DialogFragment dialog = (DialogFragment) manager
 					.findFragmentByTag(BackUpDialog.class.getName());
 
-			dialog.dismiss();
+			if (dialog != null) dialog.dismiss();
 
-			manager.beginTransaction()
-					.remove(manager
-							.findFragmentByTag(TaskManagerFragment.DEFAULT_TAG))
-					.commit();
+			final Fragment taskManagerFragment = manager.findFragmentByTag(TaskManagerFragment.DEFAULT_TAG);
+			if (taskManagerFragment != null) {
+				manager.beginTransaction().remove(taskManagerFragment).commit();
+			}
 
 		}
 
