@@ -54,11 +54,17 @@ final class BrowseMenuLoaders {
 			Elements fandoms = document.select("ol.fandom.index.group a[href*=/tags/]");
 
 			if (fandoms.isEmpty()) {
-				// Diagnostic-only for now: capture a snippet of whatever the page actually
-				// contained, so a mismatch between this selector and AO3's real markup can be
-				// diagnosed directly from the error message rather than guessed at blind.
-				final String bodyText = document.body() != null ? document.body().text() : "(no body)";
-				setLastErrorDetail("AO3 fandom directory: " + (bodyText.length() > 200 ? bodyText.substring(0, 200) + "..." : bodyText));
+				// The previous diagnostic just printed the first 200 characters of the page,
+				// which is useless here since AO3 puts the same generic privacy notice at the
+				// top of nearly every page regardless of what's actually wrong. Instead: report
+				// the page title (confirms whether we even got the intended page at all) and a
+				// broader, unscoped link search (confirms whether the real content is present
+				// under a different wrapper than assumed, or is genuinely missing/blocked).
+				final String title = document.title();
+				final Elements anyTagLinks = document.select("a[href*=/tags/]");
+				setLastErrorDetail("Page title: \"" + title + "\". Found 0 fandom links via the expected"
+						+ " selector, but " + anyTagLinks.size() + " links containing /tags/ anywhere on"
+						+ " the page.");
 				return false;
 			}
 
