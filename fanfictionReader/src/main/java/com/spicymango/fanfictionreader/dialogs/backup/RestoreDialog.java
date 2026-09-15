@@ -9,6 +9,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
 
+import com.google.firebase.crashlytics.FirebaseCrashlytics;
 import com.slezica.tools.async.ManagedAsyncTask;
 import com.slezica.tools.async.TaskManagerFragment;
 import com.spicymango.fanfictionreader.R;
@@ -150,7 +151,17 @@ public class RestoreDialog extends DialogFragment {
 				result = R.string.error_corrupted;
 			} catch (FileNotFoundException e) {
 				result = R.string.error_backup_not_found;
+			} catch (SecurityException e) {
+				// The app lost permission to read the picked file - most commonly because the
+				// app was killed in the background while the file picker was open (e.g. if the
+				// user browsed around for a while) and the permission grant didn't survive.
+				result = R.string.error_permission_denied;
 			} catch (IOException e) {
+				result = R.string.error_unknown;
+			} catch (Exception e) {
+				// A safety net: any other unexpected error should show a message rather than
+				// crash the whole app.
+				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
 			}
 			return result;

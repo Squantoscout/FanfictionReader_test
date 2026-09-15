@@ -172,6 +172,15 @@ public class BackUpDialog extends DialogFragment {
 			} catch (IOException e) {
 				FirebaseCrashlytics.getInstance().recordException(e);
 				result = R.string.error_unknown;
+			} catch (SecurityException e) {
+				// The app lost permission to write to the picked destination - most commonly
+				// because the app was killed in the background while the file picker was open.
+				result = R.string.error_permission_denied;
+			} catch (Exception e) {
+				// A safety net: any other unexpected error should show a message rather than
+				// crash the whole app.
+				FirebaseCrashlytics.getInstance().recordException(e);
+				result = R.string.error_unknown;
 			} finally {
 				// Note that ZipOutputStream closes the underlying OutputStream
 				try {
