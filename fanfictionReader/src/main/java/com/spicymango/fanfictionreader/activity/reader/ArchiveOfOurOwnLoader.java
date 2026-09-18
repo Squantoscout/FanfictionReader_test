@@ -126,6 +126,12 @@ class ArchiveOfOurOwnLoader extends StoryLoader {
 			// a parse failure the same way any other selector mismatch does.
 		}
 
+		// Without this, AO3 shows a "This work could have adult content" interstitial in place of
+		// the actual page for anything rated above Teen - the captured "chapter" would just be
+		// that warning screen (no "div#chapters" at all), silently producing a blank chapter
+		// rather than a visible error. Needed on both the /navigate and the chapter fetch.
+		builder.appendQueryParameter("view_adult", "true");
+
 		return builder.build();
 	}
 
@@ -180,9 +186,15 @@ class ArchiveOfOurOwnLoader extends StoryLoader {
 		// wrapper for a multi-chapter work. Scoping to "#chapters" specifically (rather than a
 		// bare "div.userstuff") matters: AO3 also uses the "userstuff" class for the work's
 		// summary/notes in the preface, above the actual chapter text.
-		final Elements storyText = document.select("div#chapters div.userstuff");
-		if (storyText.isEmpty()) return null;
-		return storyText.first().html();
+		final Element storyText = document.select("div#chapters div.userstuff").first();
+		if (storyText == null) return null;
+
+		// AO3 nests a "Chapter Text" landmark heading (meant only for screen readers jumping
+		// straight to the prose) as the first element inside that same div - strip it out so it
+		// doesn't show up as a literal line of visible text above the actual story.
+		storyText.select("h3.landmark.heading").remove();
+
+		return storyText.html();
 	}
 
 	@Override
