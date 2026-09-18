@@ -8,10 +8,6 @@
             android:title="@string/site_fanfiction">
         </item>
         <item
-            android:id="@id/fictionpress"
-            android:title="@string/site_fictionpress">
-        </item>
-        <item
             android:id="@id/archive_of_our_own"
             android:title="@string/site_archive">
         </item>
