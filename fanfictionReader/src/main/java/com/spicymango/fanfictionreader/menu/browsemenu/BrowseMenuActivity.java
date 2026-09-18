@@ -1,6 +1,5 @@
 package com.spicymango.fanfictionreader.menu.browsemenu;
 
-import android.content.Intent;
 import android.content.UriMatcher;
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,12 +23,6 @@ import android.widget.ToggleButton;
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.Settings;
 import com.spicymango.fanfictionreader.menu.BaseFragment;
-import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionCommunityBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionCrossOverBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionRegularBrowseLoader;
-import com.spicymango.fanfictionreader.menu.categorymenu.CategoryMenuActivity;
-import com.spicymango.fanfictionreader.menu.communitymenu.CommunityMenuActivity;
-import com.spicymango.fanfictionreader.menu.storymenu.StoryMenuActivity;
 import com.spicymango.fanfictionreader.util.Sites;
 
 import java.util.List;
@@ -65,13 +58,9 @@ public class BrowseMenuActivity extends AppCompatActivity {
 	}
 
 	public final static class BrowseMenuFragment extends BaseFragment<BrowseMenuItem>
-			implements OnCheckedChangeListener {
+			implements OnCheckedChangeListener, BrowseMenuSiteType {
 
 		private final static UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
-
-		private final static int SITE_ARCHIVE_OF_OUR_OWN = 0;
-		private final static int SITE_FANFICTION = 1;
-		private final static int SITE_FANFICTION_COMMUNITY = 2;
 
 		private final static String STATE_TOGGLE_BUTTON = "STATE_TOGGLE";
 
@@ -98,51 +87,31 @@ public class BrowseMenuActivity extends AppCompatActivity {
 			Uri uri = requireActivity().getIntent().getData();
 			int siteId = URI_MATCHER.match(uri);
 
+			// Each site is handled entirely by whichever site's delegate owns it, so this switch
+			// only needs to know which delegate to ask - not what that site actually does with
+			// the URI.
+			final BrowseMenuSetup setup;
 			switch (siteId) {
 			case SITE_ARCHIVE_OF_OUR_OWN:
-				setTitle(R.string.menu_browse_title_stories);
-				setSubTitle(Sites.ARCHIVE_OF_OUR_OWN.TITLE);
-				mLoaderOff = args -> new ArchiveOfOurOwnBrowseLoader(getActivity(), args);
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					// AO3 has no FanFiction.net-style genre/subgenre hierarchy - tapping a fandom
-					// goes straight to that fandom's story list, rather than through
-					// CategoryMenuActivity (which expects FanFiction.net's category page structure
-					// and doesn't know how to handle an AO3 tag URL, silently falling through and
-					// finishing).
-					Intent i = new Intent(getActivity(), StoryMenuActivity.class);
-					i.setData(getItem(position).uri);
-					startActivity(i);
-				});
+				setup = ArchiveOfOurOwnBrowseMenuDelegate.configure(siteId, getActivity());
 				break;
 			case SITE_FANFICTION:
-				setTitle(R.string.menu_browse_title_stories);
-				setSubTitle(Sites.FANFICTION.TITLE);
-				mLoaderOff = args -> new FanFictionRegularBrowseLoader(getActivity(), args);
-				mLoaderOn = args -> new FanFictionCrossOverBrowseLoader(getActivity(), args);
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					Intent i = new Intent(getActivity(), CategoryMenuActivity.class);
-					i.setData(getItem(position).uri);
-					startActivity(i);
-				});
-				enableToggleButton(R.string.toggle_regular, R.string.toggle_crossover, savedInstanceState);
-				break;
 			case SITE_FANFICTION_COMMUNITY:
-				setTitle(R.string.menu_button_communities);
-				setSubTitle(Sites.FANFICTION.TITLE);
-				mLoaderOff = args -> new FanFictionCommunityBrowseLoader(getActivity(), args);
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					Intent i;
-					if (position == 0) {
-						i = new Intent(getActivity(), CommunityMenuActivity.class);
-					} else {
-						i = new Intent(getActivity(), CategoryMenuActivity.class);
-					}
-					i.setData(getItem(position).uri);
-					startActivity(i);
-				});
+				setup = FanFictionBrowseMenuDelegate.configure(siteId, getActivity());
 				break;
 			default:
 				throw new IllegalArgumentException();
+			}
+
+			setTitle(setup.titleRes);
+			setSubTitle(setup.subtitle);
+			mLoaderOff = args -> setup.loaderOffFactory.apply(args);
+			if (setup.loaderOnFactory != null) {
+				mLoaderOn = args -> setup.loaderOnFactory.apply(args);
+			}
+			mListView.setOnItemClickListener(setup.itemClickListener);
+			if (setup.toggleLabels != null) {
+				enableToggleButton(setup.toggleLabels.textOff, setup.toggleLabels.textOn, savedInstanceState);
 			}
 
 			if (mToggle == null) {
