@@ -93,6 +93,15 @@ public abstract class StoryLoader extends AsyncTaskLoader<StoryChapter> {
 				mResult = Result.ERROR_SD;
 				return null;
 			}
+		} else if (!requiresWebViewCapture()) {
+			// This loader already has what it needs cached in memory from an earlier capture in
+			// this same session, and can serve this page without a network round-trip at all.
+			try {
+				html = getStoryFromSite(mStoryId, mCurrentPage, mData);
+			} catch (IOException e) {
+				mResult = Result.ERROR_CONNECTION;
+				return null;
+			}
 		} else {
 			// Must download story from the internet.
 
@@ -109,15 +118,6 @@ public abstract class StoryLoader extends AsyncTaskLoader<StoryChapter> {
 			} else{
 				html = parseHTML(mDataFromWebView, mData);
 				mDataFromWebView = null;
-
-				if (needsAnotherFetch(mData)) {
-					// The page just captured wasn't the chapter itself - it was only needed to
-					// resolve information (e.g. a real chapter id) that getUri() needs before it
-					// can point at the actual chapter. Loop back through the same Cloudflare/
-					// WebView capture path; getUri() will now return the next page to fetch.
-					mResult = Result.ERROR_CLOUDFLARE_CAPTCHA;
-					return null;
-				}
 			}
 		}
 
@@ -207,27 +207,26 @@ public abstract class StoryLoader extends AsyncTaskLoader<StoryChapter> {
 	protected abstract void reDownload(final long storyId, final int currentPage);
 
 	/**
-	 * Whether another Cloudflare/WebView capture round-trip is needed before this chapter is
-	 * actually ready, right after the most recently captured page was just consumed by
-	 * {@link #parseHTML}.
+	 * Whether downloading this chapter must go through a real Cloudflare/WebView capture before
+	 * {@link #loadInBackground()} will render anything, or whether {@link #getStoryFromSite} can
+	 * already serve it without one.
 	 *
-	 * <p>Defaults to false: a single capture round-trip is enough for every site so far. A site
-	 * whose {@link #getUri()} depends on something not knowable until an earlier page has already
-	 * been captured - e.g. Archive of Our Own, which has to resolve a chapter's real, opaque id
-	 * via the work's own {@code /navigate} page before it can even ask for the chapter itself, and
-	 * has no way to do that resolution except through the same real-browser capture every other
-	 * fetch in this app uses (a plain background HTTP request to AO3 is not reliable - see
-	 * {@code ArchiveOfOurOwnLoader}) - should override this to return true immediately after
-	 * consuming that earlier page, so {@link #loadInBackground()} loops back through the capture
-	 * flow instead of treating the earlier page's content as the final chapter text.
-	 * {@link #getUri()} is called again before the next capture, so it should return the next page
-	 * to fetch based on whatever state was resolved from the previous one.
+	 * <p>Defaults to {@code true} (every site needs a real capture the first time). A loader that
+	 * fetches more than it strictly needs on that first capture - e.g. Archive of Our Own, which
+	 * fetches an entire work's every chapter in one page rather than one chapter at a time, since
+	 * a plain background request for just one chapter isn't reliable against AO3 (see
+	 * {@code ArchiveOfOurOwnLoader}) - can override this to start returning {@code false} once
+	 * it's holding enough already-captured content in memory to serve a later chapter turn
+	 * without asking for another capture. {@link #getStoryFromSite} is what actually serves that
+	 * page in that case, entirely from memory - it should never attempt its own network fetch, or
+	 * this stops being an optimization and just reintroduces the plain-background-request problem
+	 * this hook exists to route around.
 	 *
-	 * @param data The in-progress chapter data, as populated so far by {@link #parseHTML}
-	 * @return True if another capture round-trip is needed before this chapter is complete
+	 * @return True if a real Cloudflare/WebView capture is required for this page, false if
+	 *         {@link #getStoryFromSite} can already serve it from memory
 	 */
-	protected boolean needsAnotherFetch(StoryChapter data) {
-		return false;
+	protected boolean requiresWebViewCapture() {
+		return true;
 	}
 	
 	/**
