@@ -195,19 +195,22 @@ class ArchiveOfOurOwnLoader extends StoryLoader {
 	 * Extracts one chapter's body text out of its containing element (either a "div.chapter"
 	 * block, for a multi-chapter work, or the whole "div#chapters" element, for a one-shot).
 	 *
-	 * <p>The prose is nested in a "div.userstuff" inside that root - scoping the selector to the
-	 * root (rather than a bare "div.userstuff" against the whole document) matters: AO3 also uses
-	 * the "userstuff" class for the work's summary/notes in the preface, and, on a
-	 * "view_full_work" page, for every other chapter's body too.
+	 * <p>The prose is nested in a "div.userstuff.module" inside that root. Matching on both
+	 * classes together (rather than a bare "div.userstuff") matters: AO3 marks the work's own
+	 * summary in the preface, and any chapter-level author's notes at the top or bottom of a
+	 * chapter, as a "blockquote" carrying only the "userstuff" class - never "module" - so a bare
+	 * "div.userstuff" selector would grab a chapter's own notes instead of its real text whenever
+	 * that chapter happens to have one, exactly the kind of "works for some chapters, blank for
+	 * others" inconsistency a first version of this method produced.
 	 *
-	 * @return The chapter's body html, or null if no "div.userstuff" was found (treated as a
-	 *         parse failure, the same as any other selector mismatch)
+	 * @return The chapter's body html, or null if no "div.userstuff.module" was found (treated as
+	 *         a parse failure, the same as any other selector mismatch)
 	 */
 	@Nullable
 	private static String extractStoryText(@Nullable Element root) {
 		if (root == null) return null;
 
-		final Element storyText = root.select("div.userstuff").first();
+		final Element storyText = root.select("div.userstuff.module").first();
 		if (storyText == null) return null;
 
 		// AO3 nests a "Chapter Text" landmark heading (meant only for screen readers jumping
