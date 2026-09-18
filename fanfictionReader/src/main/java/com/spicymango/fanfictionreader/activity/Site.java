@@ -14,7 +14,6 @@ import com.spicymango.fanfictionreader.provider.StoryProvider;
 @Deprecated
 public enum Site {
 	FANFICTION ("m.fanfiction.net","www.fanfiction.net", StoryProvider.FF_CONTENT_URI),
-	FICTIONPRESS("m.fictionpress.com","www.fictionpress.com", StoryProvider.FP_CONTENT_URI),
 	ARCHIVE_OF_OUR_OWN("archiveofourown.org", Uri.EMPTY);
 	
 	public final String authorityMobile;

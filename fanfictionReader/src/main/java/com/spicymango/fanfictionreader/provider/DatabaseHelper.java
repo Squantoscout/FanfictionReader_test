@@ -6,14 +6,18 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 class DatabaseHelper extends SQLiteOpenHelper implements SqlConstants {
 
-	private static final int DATABASE_VERSION = 12; //Database version 11
+	private static final int DATABASE_VERSION = 13; //Database version 13
 	private static final String DATABASE_NAME = "library.db";
 
 	//The name of the FanFiction table and the full text search virtual table
 	protected static final String FANFICTION_TABLE = "library";
 	protected static final String FANFICTION_TABLE_FTS = "fanfiction_library_fts";
 
-	protected static final String FICTIONPRESS_TABLE = "fictionpress_library";
+	/**
+	 * The FictionPress table's name. FictionPress support has been removed; this constant is
+	 * only kept so that {@link #onUpgrade} can drop the leftover table on existing installs.
+	 */
+	private static final String FICTIONPRESS_TABLE = "fictionpress_library";
 
 	// Define the trigger suffixes
 	private static final String DELETE_TRIGGER = "_DEL";
@@ -60,11 +64,9 @@ class DatabaseHelper extends SQLiteOpenHelper implements SqlConstants {
 	
 	@Override
 	public void onCreate(SQLiteDatabase db) {
-		// Create the data tables for each web site
+		// Create the data table for FanFiction.net
 		final String fanFicTable = "CREATE TABLE " + FANFICTION_TABLE + TABLE_DEF;
-		final String fictionPressTable = "CREATE TABLE " + FICTIONPRESS_TABLE + TABLE_DEF;
 		db.execSQL(fanFicTable);
-		db.execSQL(fictionPressTable);
 
 		// Create the full text search virtual tables
 		final String fanFicFTS = "CREATE VIRTUAL TABLE " + FANFICTION_TABLE_FTS + FTS_TABLE_DEF;
@@ -249,6 +251,11 @@ class DatabaseHelper extends SQLiteOpenHelper implements SqlConstants {
 			// Columns for last read and time added to library were added
             db.execSQL("ALTER TABLE " + FANFICTION_TABLE + " ADD COLUMN " + KEY_ADDED + " INTEGER DEFAULT 0");
             db.execSQL("ALTER TABLE " + FANFICTION_TABLE + " ADD COLUMN " + KEY_LAST_READ + " INTEGER DEFAULT 0");
+		}
+		if (oldVersion < 13) {
+			// FictionPress support was removed. Drop the leftover table if it exists (it was only
+			// ever created starting at version 7, so this is a no-op for newer installs).
+			db.execSQL("DROP TABLE IF EXISTS " + FICTIONPRESS_TABLE);
 		}
 	}
 }

@@ -64,7 +64,6 @@ public class ReviewMenuActivity extends AppCompatActivity{
 	public final static class ReviewMenuFragment extends BaseFragment<ReviewMenuItem>{
 		private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 		private static final int MATCHER_FF = 0;
-		private static final int MATCHER_FP = 1;
 		private static final int MATCHER_AO3 = 2;
 
 		static{
@@ -73,12 +72,6 @@ public class ReviewMenuActivity extends AppCompatActivity{
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "r/#/#/#/", MATCHER_FF);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "r/#/", MATCHER_FF);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "r/#/#/#/", MATCHER_FF);
-
-			// FictionPress reviews
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "r/#/", MATCHER_FP);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "r/#/#/#/", MATCHER_FP);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "r/#/", MATCHER_FP);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "r/#/#/#/", MATCHER_FP);
 
 			// Archive of Our Own Reviews
 			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "works/#", MATCHER_AO3);
@@ -106,7 +99,6 @@ public class ReviewMenuActivity extends AppCompatActivity{
 				case MATCHER_FF:
 					mLoaderAdapter = args -> new ReviewMenuLoaders.FanFictionReviewLoader(getActivity(), args, uri);
 					break;
-				case MATCHER_FP:
 				case MATCHER_AO3:
 					break;
 			}

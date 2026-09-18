@@ -49,7 +49,6 @@ import java.util.regex.Pattern;
  */
 class DownloaderFactory {
 	private static final int FAN_FICTION = 0;
-	private static final int FICTION_PRESS = 1;
 	private static final int AO3 = 2;
 
 	private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
@@ -63,14 +62,6 @@ class DownloaderFactory {
 		URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "s/#/", FAN_FICTION);
 		URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "s/#/#/", FAN_FICTION);
 		URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "s/#/#/*", FAN_FICTION);
-
-		// FictionPress
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "s/#/", FICTION_PRESS);
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "s/#/#/", FICTION_PRESS);
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "s/#/#/*", FICTION_PRESS);
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "s/#/", FICTION_PRESS);
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "s/#/#/", FICTION_PRESS);
-		URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "s/#/#/*", FICTION_PRESS);
 
 		// Archive of Our Own
 		URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "works/#/", AO3);

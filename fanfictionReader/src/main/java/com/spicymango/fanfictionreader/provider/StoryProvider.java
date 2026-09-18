@@ -27,7 +27,6 @@ import com.spicymango.fanfictionreader.activity.Site;
 public class StoryProvider extends ContentProvider implements SqlConstants {
 	private static final String AUTHORITY = BuildConfig.provider_authority;
 	private static final String BASE_PATH_FF = "library";
-	private static final String BASE_PATH_FP = "fictionPressLibrary";
 	
 	/**
 	 * {@link Uri} for the FanFiction content provider
@@ -35,12 +34,6 @@ public class StoryProvider extends ContentProvider implements SqlConstants {
 	 */
 	public static final Uri FF_CONTENT_URI = Uri.parse("content://" + AUTHORITY
 			+ "/" + BASE_PATH_FF);
-	/**
-	 * {@link Uri} for the FictionPress content provider
-	 * <p>
-	 */
-	public static final Uri FP_CONTENT_URI = Uri.parse("content://" + AUTHORITY
-			+ "/" + BASE_PATH_FP);
 	
 	private static final String STORIES_MIME_TYPE = ContentResolver.CURSOR_DIR_BASE_TYPE + "/vnd.com.spicymango.fanfictionreader.stories";
 	private static final String STORY_MIME_TYPE = ContentResolver.CURSOR_ITEM_BASE_TYPE + "/vnd.com.spicymango.fanfictionreader.story";
@@ -49,7 +42,6 @@ public class StoryProvider extends ContentProvider implements SqlConstants {
 	private static final int GET_ONE = 			0b01;
 	private static final int GET_MASK = 		0b01;
 	private static final int FANFICTION = 		0b00;
-	private static final int FICTIONPRESS = 	0b10;
 	private static final int SITE_MASK = 		0b10;
 	
 	private static final UriMatcher URI_MATCHER;
@@ -58,8 +50,6 @@ public class StoryProvider extends ContentProvider implements SqlConstants {
 		URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 		URI_MATCHER.addURI(AUTHORITY, BASE_PATH_FF, GET_ALL | FANFICTION);
 		URI_MATCHER.addURI(AUTHORITY, BASE_PATH_FF + "/#", GET_ONE | FANFICTION);
-		URI_MATCHER.addURI(AUTHORITY, BASE_PATH_FP, GET_ALL | FICTIONPRESS);
-		URI_MATCHER.addURI(AUTHORITY, BASE_PATH_FP + "/#", GET_ONE | FICTIONPRESS);
 	}
 
 	private DatabaseHelper db;
@@ -68,8 +58,6 @@ public class StoryProvider extends ContentProvider implements SqlConstants {
 		switch (id & SITE_MASK) {
 		case FANFICTION:
 			return DatabaseHelper.FANFICTION_TABLE;
-		case FICTIONPRESS:
-			return DatabaseHelper.FICTIONPRESS_TABLE;
 		default:
 			throw new IllegalArgumentException("StoryProvider - getTable: Table does not exist");
 		}
