@@ -40,7 +40,6 @@ public class CommunityMenuActivity extends AppCompatActivity {
 		
 		private static final int ARCHIVE_OF_OUR_OWN_COLLECTION = 2;
 		private static final int FANFICTION_COMMUNITY = 0;
-		private static final int FICTIONPRESS_COMMUNITY = 1;
 		
 		private static final UriMatcher URI_MATCHER;
 
@@ -52,12 +51,6 @@ public class CommunityMenuActivity extends AppCompatActivity {
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "communities/*/*/", FANFICTION_COMMUNITY);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "communities/general/", FANFICTION_COMMUNITY);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "communities/*/*/", FANFICTION_COMMUNITY);
-			
-			// FictionPress Communities
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "communities/general/", FICTIONPRESS_COMMUNITY);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "communities/*/*/", FICTIONPRESS_COMMUNITY);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "communities/general/", FICTIONPRESS_COMMUNITY);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "communities/*/*/", FICTIONPRESS_COMMUNITY);
 			
 			// Archive of Our Own Collections
 			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "collections", ARCHIVE_OF_OUR_OWN_COLLECTION);
@@ -81,11 +74,6 @@ public class CommunityMenuActivity extends AppCompatActivity {
 
 			switch (site) {
 			case FANFICTION_COMMUNITY:
-				mLoaderAdapter = args -> new FanFictionCommunityLoader(getActivity(), args, uri);
-				setTitle(R.string.menu_button_communities);
-				setSubTitle(WordUtils.capitalize(uri.getLastPathSegment()));
-				break;
-			case FICTIONPRESS_COMMUNITY:
 				mLoaderAdapter = args -> new FanFictionCommunityLoader(getActivity(), args, uri);
 				setTitle(R.string.menu_button_communities);
 				setSubTitle(WordUtils.capitalize(uri.getLastPathSegment()));

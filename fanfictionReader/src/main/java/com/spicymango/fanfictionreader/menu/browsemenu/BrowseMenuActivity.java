@@ -24,13 +24,9 @@ import android.widget.ToggleButton;
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.Settings;
 import com.spicymango.fanfictionreader.menu.BaseFragment;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.ArchiveOfOurOwnBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FanFictionCommunityBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FanFictionCrossOverBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FanFictionRegularBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FictionPressCommunityBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FictionPressPoetryPressBrowseLoader;
-import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuLoaders.FictionpressFictionPressBrowseLoader;
+import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionCommunityBrowseLoader;
+import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionCrossOverBrowseLoader;
+import com.spicymango.fanfictionreader.menu.browsemenu.FanFictionBrowseLoaders.FanFictionRegularBrowseLoader;
 import com.spicymango.fanfictionreader.menu.categorymenu.CategoryMenuActivity;
 import com.spicymango.fanfictionreader.menu.communitymenu.CommunityMenuActivity;
 import com.spicymango.fanfictionreader.menu.storymenu.StoryMenuActivity;
@@ -76,8 +72,6 @@ public class BrowseMenuActivity extends AppCompatActivity {
 		private final static int SITE_ARCHIVE_OF_OUR_OWN = 0;
 		private final static int SITE_FANFICTION = 1;
 		private final static int SITE_FANFICTION_COMMUNITY = 2;
-		private final static int SITE_FICTIONPRESS = 3;
-		private final static int SITE_FICTIONPRESS_COMMUNITY = 4;
 
 		private final static String STATE_TOGGLE_BUTTON = "STATE_TOGGLE";
 
@@ -91,13 +85,6 @@ public class BrowseMenuActivity extends AppCompatActivity {
 			//FanFiction Desktop
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, null, SITE_FANFICTION);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "communities/", SITE_FANFICTION_COMMUNITY);
-			
-			//FictionPress Mobile
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, null, SITE_FICTIONPRESS);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "communities/", SITE_FICTIONPRESS_COMMUNITY);
-			//FictionPress Desktop
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, null, SITE_FICTIONPRESS);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "communities/", SITE_FICTIONPRESS_COMMUNITY);
 		}
 
 		private int mActiveLoaderId;
@@ -118,10 +105,10 @@ public class BrowseMenuActivity extends AppCompatActivity {
 				mLoaderOff = args -> new ArchiveOfOurOwnBrowseLoader(getActivity(), args);
 				mListView.setOnItemClickListener((parent, view, position, id) -> {
 					// AO3 has no FanFiction.net-style genre/subgenre hierarchy - tapping a fandom
-					// goes straight to that fandom's story list, the same way FictionPress does
-					// below, rather than through CategoryMenuActivity (which expects
-					// FanFiction.net's category page structure and doesn't know how to handle an
-					// AO3 tag URL, silently falling through and finishing).
+					// goes straight to that fandom's story list, rather than through
+					// CategoryMenuActivity (which expects FanFiction.net's category page structure
+					// and doesn't know how to handle an AO3 tag URL, silently falling through and
+					// finishing).
 					Intent i = new Intent(getActivity(), StoryMenuActivity.class);
 					i.setData(getItem(position).uri);
 					startActivity(i);
@@ -143,33 +130,6 @@ public class BrowseMenuActivity extends AppCompatActivity {
 				setTitle(R.string.menu_button_communities);
 				setSubTitle(Sites.FANFICTION.TITLE);
 				mLoaderOff = args -> new FanFictionCommunityBrowseLoader(getActivity(), args);
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					Intent i;
-					if (position == 0) {
-						i = new Intent(getActivity(), CommunityMenuActivity.class);
-					} else {
-						i = new Intent(getActivity(), CategoryMenuActivity.class);
-					}
-					i.setData(getItem(position).uri);
-					startActivity(i);
-				});
-				break;
-			case SITE_FICTIONPRESS:
-				setTitle(R.string.menu_browse_title_stories);
-				setSubTitle(Sites.FICTIONPRESS.TITLE);
-				mLoaderOff = args -> new FictionpressFictionPressBrowseLoader(getActivity(), args);
-				mLoaderOn = args -> new FictionPressPoetryPressBrowseLoader(getActivity(), args);
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					Intent i = new Intent(getActivity(), StoryMenuActivity.class);
-					i.setData(getItem(position).uri);
-					startActivity(i);
-				});
-				enableToggleButton(R.string.toggle_fiction, R.string.toggle_poetry, savedInstanceState);
-				break;
-			case SITE_FICTIONPRESS_COMMUNITY:
-				setTitle(R.string.menu_button_communities);
-				setSubTitle(Sites.FICTIONPRESS.TITLE);
-				mLoaderOff = args -> new FictionPressCommunityBrowseLoader(getActivity(), args);
 				mListView.setOnItemClickListener((parent, view, position, id) -> {
 					Intent i;
 					if (position == 0) {

@@ -68,13 +68,8 @@ public class CategoryMenuActivity extends AppCompatActivity {
 		private static final int FANFICTION_CROSSOVER = 1;
 		private static final int FANFICTION_SUB_CATEGORY = 2;
 		private static final int FANFICTION_COMMUNITY = 3;
-		private static final int ARCHIVE_OF_OUR_OWN_NORMAL = 4;
-		private static final int FICTIONPRESS_COMMUNITY = 5;
 
 		static {
-			// Archive Of Our Own
-			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "media/*/fandoms", ARCHIVE_OF_OUR_OWN_NORMAL);
-
 			// FanFiction Mobile Site
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "crossovers/*/", FANFICTION_CROSSOVER);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "crossovers/*/#/", FANFICTION_SUB_CATEGORY);
@@ -85,11 +80,6 @@ public class CategoryMenuActivity extends AppCompatActivity {
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "crossovers/*/#/", FANFICTION_SUB_CATEGORY);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "communities/*/", FANFICTION_COMMUNITY);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/", FANFICTION_REGULAR);
-
-			// FictionPress Mobile Site
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "communities/*/", FICTIONPRESS_COMMUNITY);
-			// FictionPress Desktop Site
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "communities/*/", FICTIONPRESS_COMMUNITY);
 		}
 
 		private LoaderAdapter<CategoryMenuItem> mLoaderAdapter;
@@ -105,17 +95,6 @@ public class CategoryMenuActivity extends AppCompatActivity {
 			int site = URI_MATCHER.match(uri);
 
 			switch (site) {
-			case ARCHIVE_OF_OUR_OWN_NORMAL:
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					final Intent i = new Intent(getActivity(), StoryMenuActivity.class);
-					i.setData(getItem(position).mUri);
-					startActivity(i);
-				});
-				mLoaderAdapter = args -> new ArchiveOfOurOwnCategoryLoader(getActivity(), args, uri);
-				setTitle(R.string.menu_navigation_title_regular);
-				String subTitle = WordUtils.capitalize(uri.getPathSegments().get(1), ' ', '.', '\'');
-				setSubTitle(subTitle.replace("*a*", "&"));
-				break;
 			case FANFICTION_REGULAR:
 				mListView.setOnItemClickListener((parent, view, position, id) -> {
 					final Intent i = new Intent(getActivity(), StoryMenuActivity.class);
@@ -153,16 +132,6 @@ public class CategoryMenuActivity extends AppCompatActivity {
 					startActivity(i);
 				});
 				mLoaderAdapter = args -> new FanFictionCommunityCategoryLoader(getActivity(), args, uri);
-				setTitle(R.string.menu_navigation_title_community);
-				setSubTitle(WordUtils.capitalize(uri.getPathSegments().get(1), ' ', '.', '\''));
-				break;
-			case FICTIONPRESS_COMMUNITY:
-				mListView.setOnItemClickListener((parent, view, position, id) -> {
-					final Intent i = new Intent(getActivity(), CommunityMenuActivity.class);
-					i.setData(getItem(position).mUri);
-					startActivity(i);
-				});
-				mLoaderAdapter = args -> new FictionPressCommunityCategoryLoader(getActivity(), args, uri);
 				setTitle(R.string.menu_navigation_title_community);
 				setSubTitle(WordUtils.capitalize(uri.getPathSegments().get(1), ' ', '.', '\''));
 				break;

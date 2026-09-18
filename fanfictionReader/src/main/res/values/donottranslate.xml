@@ -3,7 +3,6 @@
 
     <string name="site_fanfiction">FanFiction</string>
     <string name="site_archive">Archive of Our Own</string>
-    <string name="site_fictionpress">FictionPress</string>
 
     <string name="pref_text_size_default" translatable="false">14</string>
 
@@ -90,12 +89,6 @@
         <item>@string/general_movies</item>
         <item>@string/general_plays</item>
         <item>@string/general_tv</item>
-    </string-array>
-
-    <string-array name="browse_menu_fp_community">
-        <item>@string/menu_browse_general_communities</item>
-        <item>@string/toggle_fiction</item>
-        <item>@string/toggle_poetry</item>
     </string-array>
 
     <!-- Navigation Menu Activity  -->

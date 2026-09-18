@@ -151,12 +151,6 @@ public class MainActivity extends AppCompatActivity implements OnNavigationItemS
 			ft.commit();
 			arg0.setChecked(true);
 			break;
-		case R.id.fictionpress: //FictionPress
-			ft = getSupportFragmentManager().beginTransaction();
-			ft.replace(R.id.content_frame, new FictionPressMain());
-			ft.commit();
-			arg0.setChecked(true);
-			break;
 		case R.id.settings:
 			Intent i = new Intent(this, Settings.class);
 			startActivityForResult(i, INTENT_SETTINGS);

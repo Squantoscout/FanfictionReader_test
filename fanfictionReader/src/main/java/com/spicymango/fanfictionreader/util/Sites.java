@@ -18,8 +18,7 @@ import androidx.annotation.StringRes;
 public enum Sites {
 	// Note to self: do not rename enum names. They are used as keys elsewhere
 	ARCHIVE_OF_OUR_OWN("http", "archiveofourown.org", R.string.site_archive),
-	FANFICTION("https", "m.fanfiction.net", "www.fanfiction.net", R.string.site_fanfiction), 
-	FICTIONPRESS("https", "m.fictionpress.com","www.fictionpress.com", R.string.site_fictionpress);
+	FANFICTION("https", "m.fanfiction.net", "www.fanfiction.net", R.string.site_fanfiction);
 
 	/**
 	 * The base uri for the mobile version of the web site

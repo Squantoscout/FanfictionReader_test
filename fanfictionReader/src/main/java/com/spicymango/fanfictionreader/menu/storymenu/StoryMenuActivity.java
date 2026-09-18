@@ -12,7 +12,8 @@ import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.dialogs.DetailDialog;
 import com.spicymango.fanfictionreader.menu.BaseFragment;
 import com.spicymango.fanfictionreader.menu.BaseLoader.Filterable;
-import com.spicymango.fanfictionreader.menu.storymenu.StoryMenuLoaders.*;
+import com.spicymango.fanfictionreader.menu.storymenu.ArchiveOfOurOwnStoryLoaders.*;
+import com.spicymango.fanfictionreader.menu.storymenu.FanFictionStoryLoaders.*;
 import com.spicymango.fanfictionreader.menu.storymenu.FilterDialog.FilterDialog.FilterListener;
 import com.spicymango.fanfictionreader.util.Sites;
 import com.spicymango.fanfictionreader.util.Story;
@@ -84,10 +85,6 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 		private static final int URI_FF_CROSSOVER_MENU = 1;
 		private static final int URI_FF_JUST_IN_MENU = 2;
 		private static final int URI_FF_COMMUNITY_MENU = 3;
-		// FictionPress
-		private static final int URI_FP_NORMAL_MENU = 4;
-		private static final int URI_FP_JUST_IN_MENU = 5;
-		private static final int URI_FP_COMMUNITY_MENU = 6;
 
 		private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 
@@ -112,15 +109,6 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/#/", URI_FF_CROSSOVER_MENU);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/", URI_FF_NORMAL_MENU);
 			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/*/", URI_FF_NORMAL_MENU);
-
-			// FictionPress Mobile Sites
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "j/", URI_FP_JUST_IN_MENU);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "community/*/#/", URI_FP_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY, "*/*/", URI_FP_NORMAL_MENU);
-			// FictionPress Desktop Sites
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "j/", URI_FP_JUST_IN_MENU);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "community/*/#/", URI_FP_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FICTIONPRESS.AUTHORITY_DESKTOP, "*/*/", URI_FP_NORMAL_MENU);
 		}
 
 		private LoaderAdapter<Story> mLoaderAdapter;
@@ -167,19 +155,6 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 				subTitle = uri.getPathSegments().get(1).replace('-', ' ');
 				mLoaderAdapter = args -> new FFCommunityStoryLoader(getActivity(), args, uri);
 				mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
-				break;
-			case URI_FP_NORMAL_MENU:
-				setTitle(R.string.menu_navigation_title_regular);
-				subTitle = uri.getLastPathSegment();
-				mLoaderAdapter = args -> new FPRegularStoryLoader(getActivity(), args, uri);
-				break;
-			case URI_FP_JUST_IN_MENU:
-				setTitle(R.string.menu_story_title_just_in);
-				subTitle = "";
-				break;
-			case URI_FP_COMMUNITY_MENU:
-				setTitle(R.string.menu_navigation_title_community);
-				subTitle = uri.getLastPathSegment();
 				break;
 			default:
 				throw new IllegalArgumentException("The uri " + uri + " is invalid.");

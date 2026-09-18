@@ -472,7 +472,6 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 		
 		switch (mSite) {
 		case FANFICTION:
-		case FICTIONPRESS:
 			// TODO: Make links work without chapter numbers
 			Pattern filePattern = Pattern.compile("/s/(\\d++)/(\\d++)/");
 			Matcher matcher = filePattern.matcher(uri.toString());
@@ -656,7 +655,7 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	
 	@Override
 	protected void onStop() {
-		//TODO: Archive of our own & FictionPress
+		//TODO: Archive of our own
 		if (mData != null && mData.isInLibrary()) {
 			ContentResolver resolver = getContentResolver();
 			AsyncQueryHandler handler = new AsyncQueryHandler(resolver){};
