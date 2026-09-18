@@ -7,13 +7,9 @@ import org.apache.commons.lang3.text.WordUtils;
 
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.Settings;
-import com.spicymango.fanfictionreader.activity.Site;
-import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.dialogs.DetailDialog;
 import com.spicymango.fanfictionreader.menu.BaseFragment;
 import com.spicymango.fanfictionreader.menu.BaseLoader.Filterable;
-import com.spicymango.fanfictionreader.menu.storymenu.ArchiveOfOurOwnStoryLoaders.*;
-import com.spicymango.fanfictionreader.menu.storymenu.FanFictionStoryLoaders.*;
 import com.spicymango.fanfictionreader.menu.storymenu.FilterDialog.FilterDialog.FilterListener;
 import com.spicymango.fanfictionreader.util.Sites;
 import com.spicymango.fanfictionreader.util.Story;
@@ -76,15 +72,8 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 		mFragment.onFilter(selected);
 	}
 	
-	public static final class StoryMenuFragment extends BaseFragment<Story>  implements FilterListener {
-		// ArchiveOfOurOwn
-		private static final int URI_AO3_NORMAL_MENU = 7;
-		private static final int URI_AO3_COLLECTION_MENU = 8;
-		// FanFiction
-		private static final int URI_FF_NORMAL_MENU = 0;
-		private static final int URI_FF_CROSSOVER_MENU = 1;
-		private static final int URI_FF_JUST_IN_MENU = 2;
-		private static final int URI_FF_COMMUNITY_MENU = 3;
+	public static final class StoryMenuFragment extends BaseFragment<Story>
+			implements FilterListener, StoryMenuUriType {
 
 		private static final UriMatcher URI_MATCHER = new UriMatcher(UriMatcher.NO_MATCH);
 
@@ -92,23 +81,23 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 			// Initializes the UriMatcher.
 
 			// Archive Of Our Own Sites
-			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "tags/*/works", URI_AO3_NORMAL_MENU);
-			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "collections/*/works", URI_AO3_COLLECTION_MENU);
+			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "tags/*/works", AO3_NORMAL_MENU);
+			URI_MATCHER.addURI(Sites.ARCHIVE_OF_OUR_OWN.AUTHORITY, "collections/*/works", AO3_COLLECTION_MENU);
 
 			// FanFiction Mobile Sites
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "j/", URI_FF_JUST_IN_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "community/*/#/", URI_FF_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "community/*/#/#/#/#/#/#/#/#/", URI_FF_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/#/#/", URI_FF_CROSSOVER_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/#/", URI_FF_NORMAL_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/*/", URI_FF_NORMAL_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "j/", FF_JUST_IN_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "community/*/#/", FF_COMMUNITY_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "community/*/#/#/#/#/#/#/#/#/", FF_COMMUNITY_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/#/#/", FF_CROSSOVER_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/#/", FF_NORMAL_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY, "*/*/", FF_NORMAL_MENU);
 			// FanFiction Desktop Sites
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "j/", URI_FF_JUST_IN_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "community/*/#/", URI_FF_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "community/*/#/#/#/#/#/#/#/#/", URI_FF_COMMUNITY_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/#/", URI_FF_CROSSOVER_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/", URI_FF_NORMAL_MENU);
-			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/*/", URI_FF_NORMAL_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "j/", FF_JUST_IN_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "community/*/#/", FF_COMMUNITY_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "community/*/#/#/#/#/#/#/#/#/", FF_COMMUNITY_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/#/", FF_CROSSOVER_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/#/", FF_NORMAL_MENU);
+			URI_MATCHER.addURI(Sites.FANFICTION.AUTHORITY_DESKTOP, "*/*/", FF_NORMAL_MENU);
 		}
 
 		private LoaderAdapter<Story> mLoaderAdapter;
@@ -120,51 +109,40 @@ public class StoryMenuActivity extends AppCompatActivity implements FilterListen
 			setHasOptionsMenu(true);
 
 			final Uri uri = requireActivity().getIntent().getData();
-			String subTitle;
+			final int uriType = URI_MATCHER.match(uri);
 
-			switch (URI_MATCHER.match(uri)) {
-			case URI_AO3_NORMAL_MENU:
-				setTitle(R.string.menu_navigation_title_regular);
-				subTitle = uri.getPathSegments().get(1);
-				mLoaderAdapter = args -> new AO3RegularStoryLoader(getActivity(), args, uri);
+			// Each URI type is handled entirely by whichever site's delegate owns it, so this
+			// switch only needs to know which delegate to ask - not what that site actually does
+			// with the URI.
+			final StoryMenuSetup setup;
+			switch (uriType) {
+			case AO3_NORMAL_MENU:
+			case AO3_COLLECTION_MENU:
+				setup = ArchiveOfOurOwnStoryMenuDelegate.configure(uriType, getActivity(), uri);
 				break;
-			case URI_AO3_COLLECTION_MENU:
-				setTitle(R.string.menu_navigation_title_community);
-				subTitle = uri.getPathSegments().get(1);
-				break;
-			case URI_FF_NORMAL_MENU:
-				setTitle(R.string.menu_navigation_title_regular);
-				subTitle = uri.getLastPathSegment();
-				mLoaderAdapter = args -> new FFRegularStoryLoader(getActivity(), args, uri);
-				mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
-				break;
-			case URI_FF_CROSSOVER_MENU:
-				setTitle(R.string.menu_navigation_title_crossover);
-				subTitle = uri.getPathSegments().get(0);
-				mLoaderAdapter = args -> new FFRegularStoryLoader(getActivity(), args, uri);
-				mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
-				break;
-			case URI_FF_JUST_IN_MENU:
-				setTitle(R.string.menu_story_title_just_in);
-				subTitle = "";
-				mLoaderAdapter = args -> new FFJustInStoryLoader(getActivity(), args, uri);
-				mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
-				break;
-			case URI_FF_COMMUNITY_MENU:
-				setTitle(R.string.menu_navigation_title_community);
-				subTitle = uri.getPathSegments().get(1).replace('-', ' ');
-				mLoaderAdapter = args -> new FFCommunityStoryLoader(getActivity(), args, uri);
-				mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
+			case FF_NORMAL_MENU:
+			case FF_CROSSOVER_MENU:
+			case FF_JUST_IN_MENU:
+			case FF_COMMUNITY_MENU:
+				setup = FanFictionStoryMenuDelegate.configure(uriType, getActivity(), uri);
 				break;
 			default:
 				throw new IllegalArgumentException("The uri " + uri + " is invalid.");
+			}
+
+			setTitle(setup.titleRes);
+			if (setup.loaderFactory != null) {
+				mLoaderAdapter = args -> setup.loaderFactory.apply(args);
+			}
+			if (setup.itemClickListener != null) {
+				mListView.setOnItemClickListener(setup.itemClickListener);
 			}
 
 			mListView.setOnItemLongClickListener((parent, view, position, id) -> {
 				DetailDialog.show(getActivity(), (Story) parent.getItemAtPosition(position));
 				return true;
 			});
-			setSubTitle(WordUtils.capitalize(subTitle));
+			setSubTitle(WordUtils.capitalize(setup.subtitle));
 			LoaderManager.getInstance(this).initLoader(0, mLoaderArgs, this);
 		}
 
