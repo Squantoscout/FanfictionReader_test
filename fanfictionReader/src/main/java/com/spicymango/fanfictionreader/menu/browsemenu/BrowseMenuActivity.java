@@ -104,7 +104,7 @@ public class BrowseMenuActivity extends AppCompatActivity {
 			}
 
 			setTitle(setup.titleRes);
-			setSubTitle(setup.subtitle);
+			setSubTitle(setup.subtitleRes);
 			mLoaderOff = args -> setup.loaderOffFactory.apply(args);
 			if (setup.loaderOnFactory != null) {
 				mLoaderOn = args -> setup.loaderOnFactory.apply(args);

@@ -23,7 +23,8 @@ final class BrowseMenuSetup {
 
 	@StringRes
 	final int titleRes;
-	final String subtitle;
+	@StringRes
+	final int subtitleRes;
 	final Function<Bundle, BaseLoader<BrowseMenuItem>> loaderOffFactory;
 
 	/** Null for sites with no secondary (toggle-on) loader, e.g. AO3 and FanFiction communities. */
@@ -34,12 +35,12 @@ final class BrowseMenuSetup {
 	/** Null for sites with no regular/crossover-style toggle button. */
 	final ToggleLabels toggleLabels;
 
-	BrowseMenuSetup(@StringRes int titleRes, String subtitle,
+	BrowseMenuSetup(@StringRes int titleRes, @StringRes int subtitleRes,
 			Function<Bundle, BaseLoader<BrowseMenuItem>> loaderOffFactory,
 			Function<Bundle, BaseLoader<BrowseMenuItem>> loaderOnFactory, OnItemClickListener itemClickListener,
 			ToggleLabels toggleLabels) {
 		this.titleRes = titleRes;
-		this.subtitle = subtitle;
+		this.subtitleRes = subtitleRes;
 		this.loaderOffFactory = loaderOffFactory;
 		this.loaderOnFactory = loaderOnFactory;
 		this.itemClickListener = itemClickListener;
