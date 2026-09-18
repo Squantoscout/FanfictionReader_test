@@ -1,11 +1,11 @@
 package com.spicymango.fanfictionreader.menu.storymenu;
 
 import com.spicymango.fanfictionreader.R;
-import com.spicymango.fanfictionreader.activity.Site;
 import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.menu.storymenu.FanFictionStoryLoaders.FFCommunityStoryLoader;
 import com.spicymango.fanfictionreader.menu.storymenu.FanFictionStoryLoaders.FFJustInStoryLoader;
 import com.spicymango.fanfictionreader.menu.storymenu.FanFictionStoryLoaders.FFRegularStoryLoader;
+import com.spicymango.fanfictionreader.util.Sites;
 
 import android.content.Context;
 import android.net.Uri;
@@ -34,7 +34,7 @@ final class FanFictionStoryMenuDelegate implements StoryMenuUriType {
 	static StoryMenuSetup configure(int uriType, Context context, Uri uri) {
 		// Every FanFiction.net story listing opens the same reading screen.
 		final OnItemClickListener openStory = (parent, view, position, id) ->
-				StoryDisplayActivity.openStory(context, id, Site.FANFICTION, true);
+				StoryDisplayActivity.openStory(context, id, Sites.FANFICTION, true);
 
 		switch (uriType) {
 		case FF_NORMAL_MENU:

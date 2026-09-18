@@ -24,6 +24,7 @@ import com.spicymango.fanfictionreader.menu.TabActivity;
 import com.spicymango.fanfictionreader.menu.authormenu.AuthorMenuActivity;
 import com.spicymango.fanfictionreader.util.AsyncPost;
 import com.spicymango.fanfictionreader.util.Result;
+import com.spicymango.fanfictionreader.util.Sites;
 import com.spicymango.fanfictionreader.util.Story;
 import com.spicymango.fanfictionreader.util.adapters.StoryReducedAdapter;
 
@@ -324,7 +325,7 @@ public class AccountActivity extends TabActivity {
 		@Override
 		public void onItemClick(AdapterView<?> parent, View view, int position,
 				long id) {
-			StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true);
+			StoryDisplayActivity.openStory(getActivity(), id, Sites.FANFICTION, true);
 		}
 
 		private static final class FollowsLoader extends AccountLoader {

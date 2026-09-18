@@ -44,7 +44,6 @@ import com.spicymango.fanfictionreader.BuildConfig;
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.Settings;
 import com.spicymango.fanfictionreader.activity.LogInActivity;
-import com.spicymango.fanfictionreader.activity.Site;
 import com.spicymango.fanfictionreader.dialogs.ReviewDialog;
 import com.spicymango.fanfictionreader.menu.CloudflareFragment;
 import com.spicymango.fanfictionreader.menu.mainmenu.MainActivity;
@@ -78,12 +77,14 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	 * @param site The desired site
 	 * @param autoUpdate True to update the story if on library, false otherwise
 	 */
-	public static void openStory(Context context, long id, Site site, boolean autoUpdate){
+	public static void openStory(Context context, long id, Sites site, boolean autoUpdate){
 		Uri uri;
 		Uri.Builder builder = new Uri.Builder();
 
-		builder.scheme(autoUpdate ? Site.scheme : "file") // Scheme
-				.authority(site.authorityMobile) // Authority
+		// Each site's own scheme is used here rather than a single hardcoded one - AO3 is served
+		// over "http", not "https" (decision 5 in the AO3 story-reading plan).
+		builder.scheme(autoUpdate ? site.BASE_URI.getScheme() : "file") // Scheme
+				.authority(site.AUTHORITY) // Authority
 				.appendPath("s") // Story
 				.appendPath(Long.toString(id)) // Id
 				.appendPath("1") // Chapter 1
@@ -117,7 +118,7 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	/**
 	 * Currently loaded site
 	 */
-	private Site mSite;
+	private Sites mSite;
 	private long mStoryId;
 	
 	private int mTotalPages;
@@ -217,7 +218,13 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	@NonNull
 	@Override
 	public Loader<StoryChapter> onCreateLoader(int id, Bundle args) {
-		return new FanFictionLoader(this, args, mStoryId, mCurrentPage);
+		switch (mSite) {
+		case ARCHIVE_OF_OUR_OWN:
+			return new ArchiveOfOurOwnLoader(this, args, mStoryId, mCurrentPage);
+		case FANFICTION:
+		default:
+			return new FanFictionLoader(this, args, mStoryId, mCurrentPage);
+		}
 	}
 	
 	@Override
@@ -351,8 +358,8 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 		} else if (itemId == R.id.follow || itemId == R.id.favorite){
 			//TODO: Fictionpress and archieve of our own follows
 			Uri.Builder builder = new Uri.Builder();
-			builder.scheme(Site.scheme);
-			builder.authority(Site.FANFICTION.authorityMobile);
+			builder.scheme(Sites.FANFICTION.BASE_URI.getScheme());
+			builder.authority(Sites.FANFICTION.AUTHORITY);
 			builder.appendEncodedPath("m");
 			builder.appendEncodedPath("subs.php");
 			builder.appendQueryParameter("uid", Long.toString(mAuthorId));
@@ -468,8 +475,9 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	 */
 	private boolean parseUri(Uri uri){
 
-		mSite = Site.fromAuthority(uri.getAuthority());
-		
+		mSite = Sites.fromAuthority(uri.getAuthority());
+		if (mSite == null) return false;
+
 		switch (mSite) {
 		case FANFICTION:
 			// TODO: Make links work without chapter numbers
@@ -483,7 +491,18 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 			}
 			break;
 		case ARCHIVE_OF_OUR_OWN:
-			// TODO: Add archive of our own
+			// The story id and chapter number here refer to this app's own internal routing
+			// scheme (built by openStory(), in the same "/s/{id}/{chapter}/" shape used for
+			// FanFiction.net), not to AO3's own URL shape - AO3 addresses chapters by an opaque
+			// per-chapter id, resolved separately by ArchiveOfOurOwnLoader (decision 3).
+			Pattern ao3Pattern = Pattern.compile("/s/(\\d++)/(\\d++)/");
+			Matcher ao3Matcher = ao3Pattern.matcher(uri.toString());
+			if (ao3Matcher.find()) {
+				fromBrowser = !uri.getScheme().equals("file");
+				mStoryId = Integer.parseInt(Objects.requireNonNull(ao3Matcher.group(1)));
+				mCurrentPage = Integer.parseInt(Objects.requireNonNull(ao3Matcher.group(2)));
+				return true;
+			}
 			break;
 		}
 		return false;
@@ -655,7 +674,9 @@ public class StoryDisplayActivity extends AppCompatActivity implements LoaderCal
 	
 	@Override
 	protected void onStop() {
-		//TODO: Archive of our own
+		// No AO3 content-provider table exists yet (see the AO3 story-reading plan's decision 1),
+		// so mData.isInLibrary() is always false for AO3 and this block is simply never reached
+		// for it - there's nothing to persist a last-read position into yet.
 		if (mData != null && mData.isInLibrary()) {
 			ContentResolver resolver = getContentResolver();
 			AsyncQueryHandler handler = new AsyncQueryHandler(resolver){};

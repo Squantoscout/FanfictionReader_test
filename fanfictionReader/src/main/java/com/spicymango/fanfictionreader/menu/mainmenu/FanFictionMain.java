@@ -21,7 +21,6 @@ import com.spicymango.fanfictionreader.menu.librarymenu.LibraryMenuActivity;
 import com.spicymango.fanfictionreader.activity.SearchAuthorActivity;
 import com.spicymango.fanfictionreader.activity.SearchCommunityActivity;
 import com.spicymango.fanfictionreader.activity.SearchStoryActivity;
-import com.spicymango.fanfictionreader.activity.Site;
 import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.dialogs.AboutDialog;
 import com.spicymango.fanfictionreader.menu.browsemenu.BrowseMenuActivity;
@@ -104,7 +103,7 @@ public final class FanFictionMain extends ListFragment implements OnClickListene
 				Toast toast = Toast.makeText(getActivity(), R.string.menu_toast_resume, Toast.LENGTH_SHORT);
 				toast.show();
 			}else{
-				StoryDisplayActivity.openStory(getActivity(), resumeId, Site.FANFICTION, false);
+				StoryDisplayActivity.openStory(getActivity(), resumeId, Sites.FANFICTION, false);
 			}
 			break;
 		case 8:

@@ -93,6 +93,15 @@ public abstract class StoryLoader extends AsyncTaskLoader<StoryChapter> {
 				mResult = Result.ERROR_SD;
 				return null;
 			}
+		} else if (!requiresWebViewCapture()) {
+			// This site's pages can be fetched directly with a plain HTTP request, so skip the
+			// Cloudflare/WebView capture detour entirely (needed by FanFiction.net, not by AO3).
+			try {
+				html = getStoryFromSite(mStoryId, mCurrentPage, mData);
+			} catch (IOException e) {
+				mResult = Result.ERROR_CONNECTION;
+				return null;
+			}
 		} else {
 			// Must download story from the internet.
 
@@ -196,6 +205,24 @@ public abstract class StoryLoader extends AsyncTaskLoader<StoryChapter> {
 	protected abstract String parseHTML(final String html, StoryChapter data);
 
 	protected abstract void reDownload(final long storyId, final int currentPage);
+
+	/**
+	 * Whether downloading a not-yet-in-library chapter must go through the Cloudflare/WebView
+	 * capture detour (see {@link #getStoryFromSite}) before {@link #loadInBackground()} will
+	 * render anything.
+	 *
+	 * <p>Defaults to {@code true}, matching every site's behavior before this hook existed
+	 * (namely FanFiction.net, which needs it to get past its anti-bot check). A site whose pages
+	 * can be fetched directly with a plain HTTP request - as Archive of Our Own's already are,
+	 * for the browse/story-list loaders - should override this to return {@code false}, in which
+	 * case {@link #loadInBackground()} calls {@link #getStoryFromSite} directly instead of
+	 * raising {@link Result#ERROR_CLOUDFLARE_CAPTCHA}.
+	 *
+	 * @return True if the Cloudflare/WebView capture detour is required, false otherwise
+	 */
+	protected boolean requiresWebViewCapture() {
+		return true;
+	}
 	
 	/**
 	 * Closes the cursor when finished

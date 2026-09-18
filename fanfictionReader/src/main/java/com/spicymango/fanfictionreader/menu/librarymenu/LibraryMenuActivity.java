@@ -40,7 +40,6 @@ import android.widget.Toast;
 
 import com.spicymango.fanfictionreader.R;
 import com.spicymango.fanfictionreader.Settings;
-import com.spicymango.fanfictionreader.activity.Site;
 import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.dialogs.DetailDialog;
 import com.spicymango.fanfictionreader.menu.authormenu.AuthorMenuActivity;
@@ -378,7 +377,7 @@ public class LibraryMenuActivity extends AppCompatActivity implements FilterList
 
 		@Override
 		public void onItemClick(AdapterView<?> arg0, View arg1, int position, long id) {
-			StoryDisplayActivity.openStory(getContext(), id, Site.FANFICTION, false);
+			StoryDisplayActivity.openStory(getContext(), id, Sites.FANFICTION, false);
 		}
 
 		@Override

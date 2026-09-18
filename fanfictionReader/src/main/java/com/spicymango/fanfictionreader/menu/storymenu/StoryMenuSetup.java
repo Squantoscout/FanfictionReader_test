@@ -30,8 +30,10 @@ final class StoryMenuSetup {
 	final Function<Bundle, BaseLoader<Story>> loaderFactory;
 
 	/**
-	 * Null for URI types with no working "open a story" screen yet (currently every AO3 URI type -
-	 * {@code StoryDisplayActivity} still has a literal TODO for AO3).
+	 * Null for URI types with no working "open a story" screen yet. Currently every AO3 URI type
+	 * has a click listener (see {@link ArchiveOfOurOwnStoryMenuDelegate}, now that
+	 * {@code StoryDisplayActivity} has real AO3 reading support); this stays available for any
+	 * future URI type that doesn't have one yet.
 	 */
 	final OnItemClickListener itemClickListener;
 

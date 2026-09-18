@@ -14,7 +14,7 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 import com.spicymango.fanfictionreader.R;
-import com.spicymango.fanfictionreader.activity.Site;
+import com.spicymango.fanfictionreader.util.Sites;
 import com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity;
 import com.spicymango.fanfictionreader.dialogs.DetailDialog;
 import com.spicymango.fanfictionreader.menu.BaseFragment;
@@ -61,7 +61,7 @@ public class AuthorStoryFragment extends BaseFragment<Story> implements FilterDi
 			DetailDialog.show(getActivity(), (Story) parent.getItemAtPosition(position));
 			return true;
 		});
-		mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Site.FANFICTION, true));
+		mListView.setOnItemClickListener((parent, view, position, id) -> StoryDisplayActivity.openStory(getActivity(), id, Sites.FANFICTION, true));
 
 
 		// Try to get the loader id

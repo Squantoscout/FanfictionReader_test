@@ -69,7 +69,7 @@ public class SearchStoryActivity extends BaseActivity<Story> implements OnQueryT
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position,
 			long id) {
-		StoryDisplayActivity.openStory(this, id, Site.FANFICTION, true);
+		StoryDisplayActivity.openStory(this, id, Sites.FANFICTION, true);
 	}
 	
 	@Override

@@ -83,4 +83,24 @@ public enum Sites {
 		// Fetches the id's for each web site's name
 		TITLE = name;
 	}
+
+	/**
+	 * Obtains the site with the corresponding authority (host). Unlike the deprecated
+	 * {@link com.spicymango.fanfictionreader.activity.Site#fromAuthority(String)}, this respects
+	 * each site's own scheme (e.g. AO3 is {@code http}, not {@code https} - see
+	 * {@link com.spicymango.fanfictionreader.activity.reader.StoryDisplayActivity}).
+	 *
+	 * @param authority The authority (host) of the site
+	 * @return The site, or null if no matches are found
+	 */
+	@Nullable
+	public static Sites fromAuthority(@Nullable String authority) {
+		if (authority == null) return null;
+		for (Sites site : Sites.values()) {
+			if (authority.equals(site.AUTHORITY) || authority.equals(site.AUTHORITY_DESKTOP)) {
+				return site;
+			}
+		}
+		return null;
+	}
 }
